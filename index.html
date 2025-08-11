@@ -56,6 +56,17 @@
         <button class="underline text-blue-600" data-action="edit">Edit</button>
         <button class="underline text-red-600" data-action="delete">Delete</button>
       </div>
+
+      <!-- Feedback section -->
+      <div class="mt-5 border-t pt-4">
+        <h4 class="font-medium mb-2">Feedback</h4>
+        <div class="space-y-3 feedback-list"></div>
+        <div class="mt-3 grid gap-2">
+          <input class="border p-2 rounded fb-name" placeholder="Your name (optional)" />
+          <textarea class="border p-2 rounded fb-text" placeholder="Add feedback…"></textarea>
+          <button class="bg-gray-800 text-white rounded-lg px-3 py-2 w-max fb-add">Post feedback</button>
+        </div>
+      </div>
     </div>
   </template>
 
@@ -129,6 +140,10 @@
     window.closeForm = closeForm;
 
     function renderMissions(list) {
+      // Remove all feedback listeners before re-render to avoid leaks
+      fbUnsubs.forEach((unsub) => unsub());
+      fbUnsubs.clear();
+
       missionsEl.innerHTML = '';
       const tpl = document.getElementById('cardTpl');
       list.forEach((m) => {
@@ -147,22 +162,45 @@
         const card = node.querySelector('div');
         card.querySelector('[data-action="edit"]').addEventListener('click', () => editMission(m));
         card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteMission(m));
+
+        // Feedback wiring
+        const listEl = node.querySelector('.feedback-list');
+        const nameEl = node.querySelector('.fb-name');
+        const textEl = node.querySelector('.fb-text');
+        const addBtn = node.querySelector('.fb-add');
+        addBtn.addEventListener('click', () => addFeedback(m.id, nameEl, textEl));
+        attachFeedbackListener(m.id, listEl);
+
+        missionsEl.appendChild(node);
+      });
+    }` : 'No deadline';
+        const statusPill = node.querySelector('.card-status');
+        statusPill.textContent = m.status;
+        statusPill.classList.add(
+          m.status === 'Complete' ? 'bg-green-100 text-green-700' :
+          m.status === 'In Progress' ? 'bg-amber-100 text-amber-700' :
+          'bg-gray-100 text-gray-700'
+        );
+
+        const card = node.querySelector('div');
+        card.querySelector('[data-action="edit"]').addEventListener('click', () => editMission(m));
+        card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteMission(m));
         missionsEl.appendChild(node);
       });
     }
 
     // --- 3) Firestore: live sync ---------------------------------------------
     let unsubscribe = null;
+    const fbUnsubs = new Map(); // missionId -> unsubscribe feedback listener
 
     onAuthStateChanged(auth, (user) => {
       if (!user) return;
-      // You can scope by user.uid if you want separate boards per user. For shared board across devices, we just use a single collection.
       const q = query(collection(db, 'missions'), orderBy('createdAt', 'asc'));
       unsubscribe?.();
       unsubscribe = onSnapshot(q, (snap) => {
         const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         renderMissions(items);
-        setConn(true); // if we get snapshots, we have a connection (or cache)
+        setConn(true);
       }, (err) => {
         console.error(err);
       });
@@ -209,6 +247,43 @@
       } catch (e) {
         console.error(e);
         alert('Failed to delete.');
+      }
+    }
+
+    // Feedback helpers
+    function attachFeedbackListener(missionId, listEl) {
+      // Clean previous listener if exists
+      fbUnsubs.get(missionId)?.();
+      const q = query(collection(db, 'missions', missionId, 'feedback'), orderBy('createdAt', 'asc'));
+      const unsub = onSnapshot(q, (snap) => {
+        listEl.innerHTML = '';
+        snap.forEach((d) => {
+          const f = d.data();
+          const item = document.createElement('div');
+          item.className = 'text-sm bg-gray-50 border border-gray-100 rounded p-2';
+          const who = f.name?.trim() ? f.name.trim() : 'Someone';
+          const when = f.createdAt?.toDate ? f.createdAt.toDate().toLocaleString() : '';
+          item.textContent = `${who}: ${f.text || ''}${when ? ' • ' + when : ''}`;
+          listEl.appendChild(item);
+        });
+      });
+      fbUnsubs.set(missionId, unsub);
+    }
+
+    async function addFeedback(missionId, nameInput, textInput) {
+      const text = textInput.value.trim();
+      const name = nameInput.value.trim();
+      if (!text) return alert('Write something to post.');
+      try {
+        await addDoc(collection(db, 'missions', missionId, 'feedback'), {
+          name: name || null,
+          text,
+          createdAt: serverTimestamp(),
+        });
+        textInput.value = '';
+      } catch (e) {
+        console.error(e);
+        alert('Failed to post feedback.');
       }
     }
 
