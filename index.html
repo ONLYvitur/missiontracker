@@ -32,7 +32,7 @@
 
     <div class="flex flex-wrap items-center gap-3 mb-2">
       <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded font-semibold shadow">Add Mission</button>
-      <button id="seedBtn" class="px-4 py-2 rounded border hover:bg-gray-100">Seed Demo Data</button>
+      <!-- Removed seed demo data button -->
       <div class="ml-auto flex items-center gap-2">
         <span class="text-gray-500">You are:</span>
         <span id="usernameDisplay" class="font-semibold text-blue-700"></span>
@@ -222,7 +222,7 @@
     const saveBtn = document.getElementById('saveBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const addBtn = document.getElementById('addBtn');
-    const seedBtn = document.getElementById('seedBtn');
+    // Removed seedBtn
 
     let editingId = null; // Firestore doc id when editing
 
@@ -269,19 +269,7 @@
       }
     });
 
-    // Seed demo data
-    seedBtn.addEventListener('click', async () => {
-      try {
-        await addDoc(missionsCol, {
-          title: 'First online mission',
-          description: 'This is stored in Firestore and updates live.',
-          deadline: null,
-          status: 'Pending',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      } catch (e) { alert(e.message); }
-    });
+    // Removed seed demo data event listener
 
     // Render helper
     function el(tag, attrs = {}, children = []) {
