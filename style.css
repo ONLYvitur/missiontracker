@@ -1,0 +1,7 @@
+body {
+    background-image: url('img.png'); /* path to your image */
+    background-size: cover;         /* fills the screen */
+    background-position: center;    /* centers it */
+    background-repeat: no-repeat;   /* prevents tiling */
+    background-attachment: fixed;   /* stays fixed while scrolling */
+}
