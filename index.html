@@ -187,15 +187,16 @@
       }
     }
     // Username modal logic
-    saveNameBtn.onclick = () => {
-      const val = usernameInput.value.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').slice(0,24);
-      if (val.length < 2) {
-        alert("Username must be at least 2 characters.");
-        return;
-      }
-      setUsername(val);
-      hideUsernameModal();
-    };
+   saveNameBtn.onclick = () => {
+  // Allow Hebrew, English, numbers, underscore, hyphen, space
+  const val = usernameInput.value.trim().replace(/[^\u0590-\u05FFa-zA-Z0-9_\- ]/g, '').slice(0,24);
+  if (val.length < 2) {
+    alert("Username must be at least 2 characters.");
+    return;
+  }
+  setUsername(val);
+  hideUsernameModal();
+};
     cancelNameBtn.onclick = () => {
       if (!localStorage.getItem(usernameKey)) {
         alert("You must set a username to use the site.");
