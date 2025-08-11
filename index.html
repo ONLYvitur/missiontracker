@@ -1,5 +1,4 @@
-# Write an updated index.html with robust delete (mission + comments), better error reporting, and minor UX touches.
-content = """<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -7,19 +6,42 @@ content = """<!doctype html>
   <title>Mission Tracker (Online • Firebase)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="robots" content="noindex" />
+  <style>
+    body { min-height: 100vh; }
+    #missions:empty::after {
+      content: "No missions yet. Click 'Add Mission' to begin.";
+      display: block;
+      color: #999;
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 1.125rem;
+    }
+    /* Subtle card hover */
+    .mission-card:hover { box-shadow: 0 2px 14px 0 rgba(0,0,0,0.06);}
+    /* Modal fade */
+    #formModal:not(.hidden) { animation: fadeIn 0.15s;}
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 p-6">
-  <header class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold">Mission Tracker</h1>
-    <div id="userBadge" class="text-sm text-gray-600"></div>
-  </header>
+<body class="bg-gray-50 text-gray-800 flex flex-col items-center py-10 px-4">
+  <div class="w-full max-w-2xl">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-black tracking-tight text-blue-800">Mission Tracker</h1>
+      <div id="userBadge" class="text-sm text-gray-600"></div>
+    </header>
 
-  <div class="mt-4 flex items-center gap-2">
-    <button id="addBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Add Mission</button>
-    <button id="seedBtn" class="px-3 py-2 rounded border">Seed Demo Data</button>
+    <div class="flex flex-wrap items-center gap-3 mb-2">
+      <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded font-semibold shadow">Add Mission</button>
+      <button id="seedBtn" class="px-4 py-2 rounded border hover:bg-gray-100">Seed Demo Data</button>
+      <div class="ml-auto flex items-center gap-2">
+        <span class="text-gray-500">You are:</span>
+        <span id="usernameDisplay" class="font-semibold text-blue-700"></span>
+        <button id="changeNameBtn" class="text-xs text-blue-500 underline">Change</button>
+      </div>
+    </div>
+
+    <div id="missions" class="mt-6 grid gap-5"></div>
   </div>
-
-  <div id="missions" class="mt-6 grid gap-4"></div>
 
   <!-- Modal: Create / Edit Mission -->
   <div id="formModal" class="hidden fixed inset-0 bg-black/50 z-20 flex justify-center items-center">
@@ -40,8 +62,21 @@ content = """<!doctype html>
     </div>
   </div>
 
+  <!-- Modal: Username -->
+  <div id="usernameModal" class="hidden fixed inset-0 bg-black/50 z-30 flex justify-center items-center">
+    <div class="bg-white p-7 rounded shadow max-w-xs w-full">
+      <h2 class="text-lg font-semibold mb-4">Set your username</h2>
+      <input id="usernameInput" maxlength="24" placeholder="Choose a username" class="border p-2 w-full mb-3 rounded" />
+      <div class="text-xs text-gray-500 mb-4">This will be visible to others in comments. You can change it anytime.</div>
+      <div class="flex justify-end gap-2">
+        <button id="cancelNameBtn" class="px-3 py-2">Cancel</button>
+        <button id="saveNameBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+      </div>
+    </div>
+  </div>
+
   <template id="missionCardTpl">
-    <div class="p-4 bg-white rounded shadow">
+    <div class="mission-card p-5 bg-white rounded shadow transition">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           <h3 class="font-bold text-lg truncate" data-field="title">Title</h3>
@@ -49,18 +84,17 @@ content = """<!doctype html>
           <p class="mt-1 text-sm text-gray-500" data-field="meta">—</p>
         </div>
         <div class="flex-shrink-0 space-x-2">
-          <button class="edit underline text-blue-600">Edit</button>
-          <button class="delete underline text-red-600">Delete</button>
+          <button class="edit underline text-blue-600 hover:text-blue-900">Edit</button>
+          <button class="delete underline text-red-600 hover:text-red-800">Delete</button>
         </div>
       </div>
-
       <!-- Feedback / comments -->
       <div class="mt-4 border-t pt-3">
         <h4 class="font-semibold">Feedback</h4>
         <div class="space-y-2 mt-2" data-field="comments"></div>
         <form class="mt-3 flex gap-2" data-field="commentForm">
           <input required name="text" maxlength="500" placeholder="Add feedback…" class="border p-2 rounded flex-1" />
-          <button class="bg-gray-800 text-white px-3 py-2 rounded">Post</button>
+          <button class="bg-gray-800 hover:bg-black transition text-white px-3 py-2 rounded">Post</button>
         </form>
       </div>
     </div>
@@ -81,7 +115,7 @@ content = """<!doctype html>
       apiKey: "AIzaSyA7B7rovUIpikVGepAqQI2s3Y_xePEwkSA",
       authDomain: "missiontracker-52bb7.firebaseapp.com",
       projectId: "missiontracker-52bb7",
-      storageBucket: "missiontracker-52bb7.firebasestorage.app",
+      storageBucket: "missiontracker-52bb7.appspot.com",
       messagingSenderId: "1029768338042",
       appId: "1:1029768338042:web:23b2a0539e0aab53daf9c3",
       measurementId: "G-TNVPW8RETF"
@@ -101,6 +135,80 @@ content = """<!doctype html>
         badge.textContent = 'Not signed in';
       }
     });
+
+    // --- Username (per IP) ---
+    const usernameKey = "mt_username";
+    const usernameDisplay = document.getElementById('usernameDisplay');
+    const changeNameBtn = document.getElementById('changeNameBtn');
+    const usernameModal = document.getElementById('usernameModal');
+    const usernameInput = document.getElementById('usernameInput');
+    const saveNameBtn = document.getElementById('saveNameBtn');
+    const cancelNameBtn = document.getElementById('cancelNameBtn');
+
+    let myUsername = null;
+
+    // Get IP and suggest as default username (anonymous, not reliable for authentication)
+    async function getIPUsernameSuggestion() {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        if (data && data.ip) {
+          return "user-" + data.ip.replace(/\./g, "-");
+        }
+      } catch (e) {}
+      return "user-" + Math.floor(Math.random() * 90000 + 10000);
+    }
+
+    function showUsernameModal(initial = "") {
+      usernameInput.value = initial;
+      usernameModal.classList.remove('hidden');
+      usernameInput.focus();
+    }
+
+    function hideUsernameModal() {
+      usernameModal.classList.add('hidden');
+    }
+
+    function setUsername(name) {
+      myUsername = name.trim().slice(0,24) || "anon";
+      localStorage.setItem(usernameKey, myUsername);
+      usernameDisplay.textContent = myUsername;
+    }
+
+    // Initial username setup
+    async function ensureUsername() {
+      let name = localStorage.getItem(usernameKey);
+      if (!name) {
+        // Suggest IP-based
+        name = await getIPUsernameSuggestion();
+        showUsernameModal(name);
+      } else {
+        setUsername(name);
+      }
+    }
+    // Username modal logic
+    saveNameBtn.onclick = () => {
+      const val = usernameInput.value.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').slice(0,24);
+      if (val.length < 2) {
+        alert("Username must be at least 2 characters.");
+        return;
+      }
+      setUsername(val);
+      hideUsernameModal();
+    };
+    cancelNameBtn.onclick = () => {
+      if (!localStorage.getItem(usernameKey)) {
+        alert("You must set a username to use the site.");
+        return;
+      }
+      hideUsernameModal();
+    };
+    changeNameBtn.onclick = () => {
+      showUsernameModal(myUsername || "");
+    };
+
+    // Run on load
+    await ensureUsername();
 
     // --- UI refs ---
     const missionsEl = document.getElementById('missions');
@@ -242,7 +350,7 @@ content = """<!doctype html>
             const d = c.data();
             const item = el('div', { class: 'text-sm' }, [
               el('div', { class: 'flex items-baseline gap-2' }, [
-                el('span', { class: 'font-medium' }, [d.author?.slice(0,6) || 'anon']),
+                el('span', { class: 'font-medium text-blue-700' }, [d.authorName || 'anon']),
                 el('span', { class: 'text-gray-500' }, [new Date(d.createdAt?.toDate?.() || Date.now()).toLocaleString()])
               ]),
               el('div', {}, [d.text || ''])
@@ -262,6 +370,7 @@ content = """<!doctype html>
             await addDoc(collection(db, 'missions', id, 'comments'), {
               text,
               author: auth.currentUser?.uid || 'anon',
+              authorName: myUsername || "anon",
               createdAt: serverTimestamp(),
             });
             form.reset();
@@ -274,7 +383,3 @@ content = """<!doctype html>
   </script>
 </body>
 </html>
-"""
-with open("/mnt/data/index.html", "w", encoding="utf-8") as f:
-    f.write(content)
-print("Wrote /mnt/data/index.html")
