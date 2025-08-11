@@ -1,0 +1,280 @@
+# Write an updated index.html with robust delete (mission + comments), better error reporting, and minor UX touches.
+content = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mission Tracker (Online • Firebase)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="robots" content="noindex" />
+</head>
+<body class="bg-gray-50 text-gray-800 p-6">
+  <header class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Mission Tracker</h1>
+    <div id="userBadge" class="text-sm text-gray-600"></div>
+  </header>
+
+  <div class="mt-4 flex items-center gap-2">
+    <button id="addBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Add Mission</button>
+    <button id="seedBtn" class="px-3 py-2 rounded border">Seed Demo Data</button>
+  </div>
+
+  <div id="missions" class="mt-6 grid gap-4"></div>
+
+  <!-- Modal: Create / Edit Mission -->
+  <div id="formModal" class="hidden fixed inset-0 bg-black/50 z-20 flex justify-center items-center">
+    <div class="bg-white p-6 rounded shadow max-w-md w-full">
+      <h2 class="text-xl font-semibold mb-4" id="formTitle">New Mission</h2>
+      <input id="title" placeholder="Title" class="border p-2 w-full mb-2 rounded" />
+      <textarea id="description" placeholder="Description" class="border p-2 w-full mb-2 rounded"></textarea>
+      <input id="deadline" type="date" class="border p-2 w-full mb-2 rounded" />
+      <select id="status" class="border p-2 w-full mb-4 rounded">
+        <option>Pending</option>
+        <option>In Progress</option>
+        <option>Complete</option>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button id="cancelBtn" class="px-4 py-2">Cancel</button>
+        <button id="saveBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="missionCardTpl">
+    <div class="p-4 bg-white rounded shadow">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <h3 class="font-bold text-lg truncate" data-field="title">Title</h3>
+          <p class="mt-1" data-field="description">Description…</p>
+          <p class="mt-1 text-sm text-gray-500" data-field="meta">—</p>
+        </div>
+        <div class="flex-shrink-0 space-x-2">
+          <button class="edit underline text-blue-600">Edit</button>
+          <button class="delete underline text-red-600">Delete</button>
+        </div>
+      </div>
+
+      <!-- Feedback / comments -->
+      <div class="mt-4 border-t pt-3">
+        <h4 class="font-semibold">Feedback</h4>
+        <div class="space-y-2 mt-2" data-field="comments"></div>
+        <form class="mt-3 flex gap-2" data-field="commentForm">
+          <input required name="text" maxlength="500" placeholder="Add feedback…" class="border p-2 rounded flex-1" />
+          <button class="bg-gray-800 text-white px-3 py-2 rounded">Post</button>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <script type="module">
+    // --- Firebase SDK (v10) ---
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import {
+      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
+      onSnapshot, serverTimestamp, query, orderBy,
+      getDocs, writeBatch
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    // --- Your Firebase project ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyA7B7rovUIpikVGepAqQI2s3Y_xePEwkSA",
+      authDomain: "missiontracker-52bb7.firebaseapp.com",
+      projectId: "missiontracker-52bb7",
+      storageBucket: "missiontracker-52bb7.firebasestorage.app",
+      messagingSenderId: "1029768338042",
+      appId: "1:1029768338042:web:23b2a0539e0aab53daf9c3",
+      measurementId: "G-TNVPW8RETF"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // --- Auth: sign in anonymously so each user has a uid for comments ---
+    signInAnonymously(auth).catch(console.error);
+    onAuthStateChanged(auth, (user) => {
+      const badge = document.getElementById('userBadge');
+      if (user) {
+        badge.textContent = `Signed in (anon) – ${user.uid.slice(0, 6)}…`;
+      } else {
+        badge.textContent = 'Not signed in';
+      }
+    });
+
+    // --- UI refs ---
+    const missionsEl = document.getElementById('missions');
+    const modal = document.getElementById('formModal');
+    const formTitle = document.getElementById('formTitle');
+    const titleEl = document.getElementById('title');
+    const descEl = document.getElementById('description');
+    const deadlineEl = document.getElementById('deadline');
+    const statusEl = document.getElementById('status');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const addBtn = document.getElementById('addBtn');
+    const seedBtn = document.getElementById('seedBtn');
+
+    let editingId = null; // Firestore doc id when editing
+
+    function openForm(isEdit = false) {
+      formTitle.textContent = isEdit ? 'Edit Mission' : 'New Mission';
+      modal.classList.remove('hidden');
+    }
+    function closeForm() {
+      modal.classList.add('hidden');
+      editingId = null;
+      titleEl.value = '';
+      descEl.value = '';
+      deadlineEl.value = '';
+      statusEl.value = 'Pending';
+    }
+
+    cancelBtn.addEventListener('click', closeForm);
+    addBtn.addEventListener('click', () => openForm(false));
+
+    // --- Firestore collections ---
+    const missionsCol = collection(db, 'missions');
+
+    // Create or update mission
+    saveBtn.addEventListener('click', async () => {
+      const payload = {
+        title: titleEl.value.trim() || 'Untitled',
+        description: descEl.value.trim(),
+        deadline: deadlineEl.value || null,
+        status: statusEl.value,
+        updatedAt: serverTimestamp(),
+      };
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, 'missions', editingId), payload);
+        } else {
+          await addDoc(missionsCol, {
+            ...payload,
+            createdAt: serverTimestamp(),
+          });
+        }
+        closeForm();
+      } catch (e) {
+        alert('Failed to save mission: ' + e.message);
+      }
+    });
+
+    // Seed demo data
+    seedBtn.addEventListener('click', async () => {
+      try {
+        await addDoc(missionsCol, {
+          title: 'First online mission',
+          description: 'This is stored in Firestore and updates live.',
+          deadline: null,
+          status: 'Pending',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (e) { alert(e.message); }
+    });
+
+    // Render helper
+    function el(tag, attrs = {}, children = []) {
+      const n = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => {
+        if (k === 'class') n.className = v;
+        else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+        else n.setAttribute(k, v);
+      });
+      children.forEach(c => n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+      return n;
+    }
+
+    // Delete mission + all comments (batched)
+    async function deleteMissionAndComments(id) {
+      if (!confirm('Delete this mission and all its feedback?')) return;
+      try {
+        const missionRef = doc(db, 'missions', id);
+        const commentsRef = collection(missionRef, 'comments');
+        const commentsSnap = await getDocs(commentsRef);
+
+        const batch = writeBatch(db);
+        commentsSnap.forEach(c => batch.delete(c.ref));
+        batch.delete(missionRef);
+        await batch.commit();
+      } catch (err) {
+        console.error('Failed to delete mission/comments:', err);
+        alert('Delete failed: ' + (err?.message || err));
+      }
+    }
+
+    // Subscribe to missions in real-time
+    const qMissions = query(missionsCol, orderBy('createdAt', 'desc'));
+    onSnapshot(qMissions, (snap) => {
+      missionsEl.innerHTML = '';
+      const tpl = document.getElementById('missionCardTpl');
+      snap.forEach((docSnap) => {
+        const m = docSnap.data();
+        const id = docSnap.id;
+        const card = tpl.content.cloneNode(true);
+
+        card.querySelector('[data-field="title"]').textContent = m.title || 'Untitled';
+        card.querySelector('[data-field="description"]').textContent = m.description || '';
+        const meta = [];
+        meta.push('Status: ' + (m.status || 'Pending'));
+        meta.push('Deadline: ' + (m.deadline || '—'));
+        card.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
+
+        // Edit
+        card.querySelector('.edit').addEventListener('click', () => {
+          editingId = id;
+          titleEl.value = m.title || '';
+          descEl.value = m.description || '';
+          deadlineEl.value = m.deadline || '';
+          statusEl.value = m.status || 'Pending';
+          openForm(true);
+        });
+        // Delete (mission + comments)
+        card.querySelector('.delete').addEventListener('click', () => deleteMissionAndComments(id));
+
+        // Comments live list
+        const commentsWrap = card.querySelector('[data-field="comments"]');
+        const qComments = query(collection(db, 'missions', id, 'comments'), orderBy('createdAt', 'asc'));
+        onSnapshot(qComments, (csnap) => {
+          commentsWrap.innerHTML = '';
+          csnap.forEach((c) => {
+            const d = c.data();
+            const item = el('div', { class: 'text-sm' }, [
+              el('div', { class: 'flex items-baseline gap-2' }, [
+                el('span', { class: 'font-medium' }, [d.author?.slice(0,6) || 'anon']),
+                el('span', { class: 'text-gray-500' }, [new Date(d.createdAt?.toDate?.() || Date.now()).toLocaleString()])
+              ]),
+              el('div', {}, [d.text || ''])
+            ]);
+            commentsWrap.appendChild(item);
+          });
+        });
+
+        // Comment form
+        const form = card.querySelector('[data-field="commentForm"]');
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const data = new FormData(form);
+          const text = (data.get('text') || '').toString().trim();
+          if (!text) return;
+          try {
+            await addDoc(collection(db, 'missions', id, 'comments'), {
+              text,
+              author: auth.currentUser?.uid || 'anon',
+              createdAt: serverTimestamp(),
+            });
+            form.reset();
+          } catch (e2) { alert('Failed to post: ' + (e2?.message || e2)); }
+        });
+
+        missionsEl.appendChild(card);
+      });
+    });
+  </script>
+</body>
+</html>
+"""
+with open("/mnt/data/index.html", "w", encoding="utf-8") as f:
+    f.write(content)
+print("Wrote /mnt/data/index.html")
