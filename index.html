@@ -7,7 +7,13 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="robots" content="noindex" />
   <style>
-    body { min-height: 100vh; }
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, #e8eefe 0%, #ffffff 100%),
+        url('img/emblem.png') center 120px no-repeat;
+      background-size: cover, 320px auto;
+    }
     #missions:empty::after {
       content: "No missions yet. Click 'Add Mission' to begin.";
       display: block;
@@ -16,9 +22,7 @@
       margin-top: 2rem;
       font-size: 1.125rem;
     }
-    /* Subtle card hover */
     .mission-card:hover { box-shadow: 0 2px 14px 0 rgba(0,0,0,0.06);}
-    /* Modal fade */
     #formModal:not(.hidden) { animation: fadeIn 0.15s;}
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
@@ -27,12 +31,11 @@
   <div class="w-full max-w-2xl">
     <header class="flex items-center justify-between mb-6">
       <h1 class="text-3xl font-black tracking-tight text-blue-800">Mission Tracker</h1>
-      <div id="userBadge" class="text-sm text-gray-600"></div>
+      <!-- Removed userBadge -->
     </header>
 
     <div class="flex flex-wrap items-center gap-3 mb-2">
       <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded font-semibold shadow">Add Mission</button>
-      <!-- Removed seed demo data button -->
       <div class="ml-auto flex items-center gap-2">
         <span class="text-gray-500">You are:</span>
         <span id="usernameDisplay" class="font-semibold text-blue-700"></span>
@@ -127,14 +130,6 @@
 
     // --- Auth: sign in anonymously so each user has a uid for comments ---
     signInAnonymously(auth).catch(console.error);
-    onAuthStateChanged(auth, (user) => {
-      const badge = document.getElementById('userBadge');
-      if (user) {
-        badge.textContent = `Signed in (anon) – ${user.uid.slice(0, 6)}…`;
-      } else {
-        badge.textContent = 'Not signed in';
-      }
-    });
 
     // --- Username (per IP) ---
     const usernameKey = "mt_username";
@@ -187,16 +182,16 @@
       }
     }
     // Username modal logic
-   saveNameBtn.onclick = () => {
-  // Allow Hebrew, English, numbers, underscore, hyphen, space
-  const val = usernameInput.value.trim().replace(/[^\u0590-\u05FFa-zA-Z0-9_\- ]/g, '').slice(0,24);
-  if (val.length < 2) {
-    alert("Username must be at least 2 characters.");
-    return;
-  }
-  setUsername(val);
-  hideUsernameModal();
-};
+    saveNameBtn.onclick = () => {
+      // Allow Hebrew, English, numbers, underscore, hyphen, space
+      const val = usernameInput.value.trim().replace(/[^\u0590-\u05FFa-zA-Z0-9_\- ]/g, '').slice(0,24);
+      if (val.length < 2) {
+        alert("Username must be at least 2 characters.");
+        return;
+      }
+      setUsername(val);
+      hideUsernameModal();
+    };
     cancelNameBtn.onclick = () => {
       if (!localStorage.getItem(usernameKey)) {
         alert("You must set a username to use the site.");
@@ -222,7 +217,6 @@
     const saveBtn = document.getElementById('saveBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const addBtn = document.getElementById('addBtn');
-    // Removed seedBtn
 
     let editingId = null; // Firestore doc id when editing
 
@@ -268,8 +262,6 @@
         alert('Failed to save mission: ' + e.message);
       }
     });
-
-    // Removed seed demo data event listener
 
     // Render helper
     function el(tag, attrs = {}, children = []) {
