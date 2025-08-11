@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mission Tracker (Offline)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-6">
+  <h1 class="text-2xl font-bold mb-4">Mission Tracker</h1>
+  <button onclick="openForm()" class="bg-blue-600 text-white px-4 py-2 rounded">Add Mission</button>
+  <div id="missions" class="mt-4 grid gap-4"></div>
+
+  <div id="formModal" class="hidden fixed inset-0 bg-black/50 flex justify-center items-center">
+    <div class="bg-white p-6 rounded shadow max-w-md w-full">
+      <h2 class="text-xl font-semibold mb-4" id="formTitle">New Mission</h2>
+      <input id="title" placeholder="Title" class="border p-2 w-full mb-2" />
+      <textarea id="description" placeholder="Description" class="border p-2 w-full mb-2"></textarea>
+      <input id="deadline" type="date" class="border p-2 w-full mb-2" />
+      <select id="status" class="border p-2 w-full mb-4">
+        <option>Pending</option>
+        <option>In Progress</option>
+        <option>Complete</option>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeForm()" class="px-4 py-2">Cancel</button>
+        <button onclick="saveMission()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let missions = JSON.parse(localStorage.getItem('missions') || '[]');
+    let editId = null;
+
+    function renderMissions() {
+      const container = document.getElementById('missions');
+      container.innerHTML = '';
+      missions.forEach((m, i) => {
+        container.innerHTML += `
+          <div class="p-4 bg-white rounded shadow">
+            <h3 class="font-bold">${m.title}</h3>
+            <p>${m.description || ''}</p>
+            <p class="text-sm text-gray-500">Deadline: ${m.deadline || '—'} | Status: ${m.status}</p>
+            <div class="mt-2 flex gap-2">
+              <button onclick="editMission(${i})" class="underline text-blue-600">Edit</button>
+              <button onclick="deleteMission(${i})" class="underline text-red-600">Delete</button>
+            </div>
+          </div>`;
+      });
+    }
+
+    function openForm() {
+      document.getElementById('formModal').classList.remove('hidden');
+    }
+    function closeForm() {
+      document.getElementById('formModal').classList.add('hidden');
+      document.getElementById('title').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('deadline').value = '';
+      document.getElementById('status').value = 'Pending';
+      editId = null;
+    }
+    function saveMission() {
+      const m = {
+        title: document.getElementById('title').value,
+        description: document.getElementById('description').value,
+        deadline: document.getElementById('deadline').value,
+        status: document.getElementById('status').value
+      };
+      if (editId !== null) missions[editId] = m; else missions.push(m);
+      localStorage.setItem('missions', JSON.stringify(missions));
+      closeForm();
+      renderMissions();
+    }
+    function editMission(i) {
+      const m = missions[i];
+      editId = i;
+      document.getElementById('title').value = m.title;
+      document.getElementById('description').value = m.description;
+      document.getElementById('deadline').value = m.deadline;
+      document.getElementById('status').value = m.status;
+      openForm();
+    }
+    function deleteMission(i) {
+      if (!confirm('Delete this mission?')) return;
+      missions.splice(i, 1);
+      localStorage.setItem('missions', JSON.stringify(missions));
+      renderMissions();
+    }
+
+    renderMissions();
+  </script>
+</body>
+</html>
