@@ -47,12 +47,12 @@
 
     <!-- Category Tabs -->
     <div id="categoryTabs" class="flex gap-2 mb-4">
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-blue-100 text-blue-800" data-cat="all">All</button>
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="תקשוב">תקשוב</button>
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="לוגיסטיקה">לוגיסטיקה</button>
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="רכב">רכב</button>
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="מטבח">מטבח</button>
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="מחנה">מחנה</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="all">All</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="תקשוב">תקשוב</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="לוגיסטיקה">לוגיסטיקה</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="רכב">רכב</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="מטבח">מטבח</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="מחנה">מחנה</button>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-2">
@@ -123,7 +123,6 @@
   </template>
 
   <script type="module">
-    // --- Firebase SDK (v10) ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import {
@@ -132,7 +131,6 @@
       getDocs, writeBatch, getDoc, setDoc
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-    // --- Your Firebase project ---
     const firebaseConfig = {
       apiKey: "AIzaSyA7B7rovUIpikVGepAqQI2s3Y_xePEwkSA",
       authDomain: "missiontracker-52bb7.firebaseapp.com",
@@ -147,7 +145,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // --- Auth UI and Logic ---
     const authEmail = document.getElementById('authEmail');
     const authPass = document.getElementById('authPass');
     const loginBtn = document.getElementById('loginBtn');
@@ -164,7 +161,6 @@
     let isSuperAdmin = false;
     let allowedCategories = [];
 
-    // Check if user is admin (admins collection: admins/{uid} exists)
     async function checkIfAdmin(uid) {
       try {
         const docRef = doc(db, "admins", uid);
@@ -194,7 +190,6 @@
       superBadge.classList.toggle("admin-visible", isSuperAdmin);
     }
 
-    // Auth state listener
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentUser = user;
@@ -231,7 +226,6 @@
       }
     });
 
-    // Login
     loginBtn.onclick = async () => {
       try {
         await signInWithEmailAndPassword(auth, authEmail.value, authPass.value);
@@ -241,7 +235,6 @@
       }
     };
 
-    // Register (allow any email for demo)
     registerBtn.onclick = async () => {
       try {
         const cred = await createUserWithEmailAndPassword(auth, authEmail.value, authPass.value);
@@ -255,10 +248,8 @@
       }
     };
 
-    // Logout
     logoutBtn.onclick = () => signOut(auth);
 
-    // --- UI refs ---
     const missionsEl = document.getElementById('missions');
     const modal = document.getElementById('formModal');
     const formTitle = document.getElementById('formTitle');
@@ -270,19 +261,30 @@
     const categoryEl = document.getElementById('category');
     const categoryTabs = document.querySelectorAll('.cat-tab');
 
-    let editingId = null; // Firestore doc id when editing
+    let editingId = null;
     let missionsCache = [];
     let selectedCategory = "all";
 
-    // Category filter
+    function updateCategoryHighlight() {
+      categoryTabs.forEach(tab => {
+        if (tab.dataset.cat === selectedCategory) {
+          tab.classList.add('bg-blue-100', 'text-blue-800');
+          tab.classList.remove('bg-gray-100', 'text-gray-700');
+        } else {
+          tab.classList.remove('bg-blue-100', 'text-blue-800');
+          tab.classList.add('bg-gray-100', 'text-gray-700');
+        }
+      });
+    }
+
     categoryTabs.forEach(tab => {
       tab.addEventListener('click', () => {
-        categoryTabs.forEach(t => t.classList.remove('bg-blue-100', 'text-blue-800'));
-        tab.classList.add('bg-blue-100', 'text-blue-800');
         selectedCategory = tab.dataset.cat;
+        updateCategoryHighlight();
         renderMissions();
       });
     });
+    updateCategoryHighlight();
 
     function openForm(isEdit = false) {
       if (!currentUser) {
@@ -311,10 +313,8 @@
       openForm(false);
     });
 
-    // --- Firestore collections ---
     const missionsCol = collection(db, 'missions');
 
-    // Create or update mission
     document.getElementById('saveBtn').addEventListener('click', async () => {
       if (!currentUser) {
         alert("You must be logged in to save a mission.");
@@ -334,7 +334,6 @@
         return;
       }
 
-      // Only allow add/edit if admin for that category or superadmin
       if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(payload.category)))) {
         alert("You are not the admin for category: " + payload.category);
         return;
@@ -355,7 +354,6 @@
       }
     });
 
-    // Delete mission + all comments (batched) -- only admins for that category or superadmin
     async function deleteMissionAndComments(id, category) {
       if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(category)))) {
         alert("You are not the admin for category: " + category);
@@ -376,14 +374,12 @@
       }
     }
 
-    // --- Feedback Logic ---
     function renderFeedbackSection(missionId, cardEl) {
       const feedbackList = cardEl.querySelector('.feedback-list');
       const feedbackInput = cardEl.querySelector('.feedback-input');
       const feedbackSubmit = cardEl.querySelector('.feedback-submit');
       feedbackInput.value = "";
 
-      // Listen for comments in real-time
       const commentsCol = collection(db, 'missions', missionId, 'comments');
       onSnapshot(commentsCol, (snap) => {
         feedbackList.innerHTML = '';
@@ -411,7 +407,6 @@
       };
     }
 
-    // Subscribe to missions in real-time
     const qMissions = query(missionsCol, orderBy('createdAt', 'desc'));
     onSnapshot(qMissions, (snap) => {
       missionsCache = [];
@@ -444,7 +439,6 @@
         meta.push('Created by: ' + (m.creator || '—'));
         cardEl.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
 
-        // Edit
         const editBtn = cardEl.querySelector('.edit');
         const canEdit = isSuperAdmin || (isAdmin && allowedCategories.includes(m.category));
         if (canEdit) {
@@ -470,7 +464,6 @@
           openForm(true);
         });
 
-        // Delete (mission + comments) -- only admins for that category or superadmin
         const deleteBtn = cardEl.querySelector('.delete');
         if (canEdit) {
           deleteBtn.classList.add("admin-visible");
@@ -479,13 +472,11 @@
         }
         deleteBtn.addEventListener('click', () => deleteMissionAndComments(id, m.category));
 
-        // Feedback
         renderFeedbackSection(id, cardEl);
 
         missionsEl.appendChild(card);
       });
     }
-    // Disable Add Mission if not logged in
     addBtn.disabled = true;
   </script>
 </body>
