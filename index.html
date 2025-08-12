@@ -3,16 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mission Tracker (Category Admins Example)</title>
+  <title>Mission Tracker (Category Admins + Superadmin)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="robots" content="noindex" />
   <style>
     body {
       min-height: 100vh;
       background:
-        linear-gradient(180deg, #e8eefe 0%, #ffffff 100%),
-        url('img/emblem.png') center 120px no-repeat;
-      background-size: cover, 320px auto;
+        linear-gradient(180deg, #e8eefe 0%, #ffffff 100%);
     }
     #missions:empty::after {
       content: "No missions yet. Click 'Add Mission' to begin.";
@@ -22,9 +20,6 @@
       margin-top: 2rem;
       font-size: 1.125rem;
     }
-    .mission-card:hover { box-shadow: 0 2px 14px 0 rgba(0,0,0,0.06);}
-    #formModal:not(.hidden) { animation: fadeIn 0.15s;}
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .admin-only { display: none; }
     .admin-visible { display: inline-block !important; }
   </style>
@@ -53,7 +48,7 @@
     <div id="categoryTabs" class="flex gap-2 mb-4">
       <button class="cat-tab px-4 py-2 rounded font-semibold bg-blue-100 text-blue-800" data-cat="all">All</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="תקשוב">תקשוב</button>
-      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="לוגסטיקה">לוגסטיקה</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="לוגיסטיקה">לוגיסטיקה</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="רכב">רכב</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="מטבח">מטבח</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="מחנה">מחנה</button>
@@ -65,6 +60,7 @@
         <span class="text-gray-500">User:</span>
         <span id="userEmailDisplay" class="font-semibold text-blue-700"></span>
         <span id="adminBadge" class="admin-only bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">Admin</span>
+        <span id="superBadge" class="admin-only bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">Superadmin</span>
       </div>
     </div>
 
@@ -78,7 +74,7 @@
       <select id="category" class="border p-2 w-full mb-2 rounded" required>
         <option value="">Select category</option>
         <option value="תקשוב">תקשוב</option>
-        <option value="לוגסטיקה">לוגסטיקה</option>
+        <option value="לוגיסטיקה">לוגיסטיקה</option>
         <option value="רכב">רכב</option>
         <option value="מטבח">מטבח</option>
         <option value="מחנה">מחנה</option>
@@ -113,15 +109,6 @@
           <button class="edit underline text-blue-600 hover:text-blue-900">Edit</button>
           <button class="delete underline text-red-600 hover:text-red-800 admin-only">Delete</button>
         </div>
-      </div>
-      <!-- Feedback / comments -->
-      <div class="mt-4 border-t pt-3">
-        <h4 class="font-semibold">Feedback</h4>
-        <div class="space-y-2 mt-2" data-field="comments"></div>
-        <form class="mt-3 flex gap-2" data-field="commentForm">
-          <input required name="text" maxlength="500" placeholder="Add feedback…" class="border p-2 rounded flex-1" />
-          <button class="bg-gray-800 hover:bg-black transition text-white px-3 py-2 rounded">Post</button>
-        </form>
       </div>
     </div>
   </template>
@@ -160,10 +147,12 @@
     const authStatus = document.getElementById('authStatus');
     const userEmailDisplay = document.getElementById('userEmailDisplay');
     const adminBadge = document.getElementById('adminBadge');
+    const superBadge = document.getElementById('superBadge');
     const addBtn = document.getElementById('addBtn');
 
     let currentUser = null;
     let isAdmin = false;
+    let isSuperAdmin = false;
     let allowedCategories = [];
 
     // Check if user is admin (admins collection: admins/{uid} exists)
@@ -174,12 +163,15 @@
         if (docSnap.exists()) {
           const data = docSnap.data();
           allowedCategories = Array.isArray(data.categories) ? data.categories : [];
+          isSuperAdmin = (data.superadmin === true) || (data.email === "admin@admins.com");
           return true;
         }
         allowedCategories = [];
+        isSuperAdmin = false;
         return false;
       } catch (e) {
         allowedCategories = [];
+        isSuperAdmin = false;
         return false;
       }
     }
@@ -188,7 +180,8 @@
       document.querySelectorAll('.admin-only').forEach(el => {
         el.classList.toggle("admin-visible", isAdmin);
       });
-      adminBadge.classList.toggle("admin-visible", isAdmin);
+      adminBadge.classList.toggle("admin-visible", isAdmin && !isSuperAdmin);
+      superBadge.classList.toggle("admin-visible", isSuperAdmin);
     }
 
     // Auth state listener
@@ -203,12 +196,14 @@
         authPass.classList.add("hidden");
         addBtn.disabled = false;
         isAdmin = await checkIfAdmin(user.uid);
-        if (isAdmin) {
+        updateAdminUI();
+        if (isSuperAdmin) {
+          authStatus.textContent = "Logged in as: " + user.email + " (Superadmin)";
+        } else if (isAdmin) {
           authStatus.textContent = "Logged in as: " + user.email + " (Admin for: " + allowedCategories.join(", ") + ")";
         } else {
           authStatus.textContent = "Logged in as: " + user.email;
         }
-        updateAdminUI();
       } else {
         currentUser = null;
         userEmailDisplay.textContent = "";
@@ -220,6 +215,7 @@
         addBtn.disabled = true;
         authStatus.textContent = "Not logged in.";
         isAdmin = false;
+        isSuperAdmin = false;
         allowedCategories = [];
         updateAdminUI();
       }
@@ -235,21 +231,10 @@
       }
     };
 
-    // Register (only allow emails in this array)
-    const allowedRegisterEmails = [
-      "admin@mission.com",
-      "admin2@mission.com",
-      "example@mission.com"
-    ];
+    // Register (allow any email for demo)
     registerBtn.onclick = async () => {
-      const email = authEmail.value.trim().toLowerCase();
-      if (!allowedRegisterEmails.includes(email)) {
-        authStatus.textContent = "Registration is only allowed for: " + allowedRegisterEmails.join(", ");
-        return;
-      }
       try {
         const cred = await createUserWithEmailAndPassword(auth, authEmail.value, authPass.value);
-        // Optionally: Add user to Firestore users collection
         await setDoc(doc(db, "users", cred.user.uid), {
           email: cred.user.email,
           createdAt: new Date()
@@ -339,8 +324,8 @@
         return;
       }
 
-      // Only allow add/edit if admin for that category
-      if (!allowedCategories.includes(payload.category)) {
+      // Only allow add/edit if admin for that category or superadmin
+      if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(payload.category)))) {
         alert("You are not the admin for category: " + payload.category);
         return;
       }
@@ -372,9 +357,9 @@
       return n;
     }
 
-    // Delete mission + all comments (batched) -- only admins for that category
+    // Delete mission + all comments (batched) -- only admins for that category or superadmin
     async function deleteMissionAndComments(id, category) {
-      if (!isAdmin || !allowedCategories.includes(category)) {
+      if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(category)))) {
         alert("You are not the admin for category: " + category);
         return;
       }
@@ -427,7 +412,7 @@
 
         // Edit
         const editBtn = card.querySelector('.edit');
-        const canEdit = isAdmin && allowedCategories.includes(m.category);
+        const canEdit = isSuperAdmin || (isAdmin && allowedCategories.includes(m.category));
         if (canEdit) {
           editBtn.style.display = '';
         } else {
@@ -451,7 +436,7 @@
           openForm(true);
         });
 
-        // Delete (mission + comments) -- only admins for that category
+        // Delete (mission + comments) -- only admins for that category or superadmin
         const deleteBtn = card.querySelector('.delete');
         if (canEdit) {
           deleteBtn.classList.add("admin-visible");
@@ -459,46 +444,6 @@
           deleteBtn.classList.remove("admin-visible");
         }
         deleteBtn.addEventListener('click', () => deleteMissionAndComments(id, m.category));
-
-        // Comments live list
-        const commentsWrap = card.querySelector('[data-field="comments"]');
-        const qComments = query(collection(db, 'missions', id, 'comments'), orderBy('createdAt', 'asc'));
-        onSnapshot(qComments, (csnap) => {
-          commentsWrap.innerHTML = '';
-          csnap.forEach((c) => {
-            const d = c.data();
-            const item = el('div', { class: 'text-sm' }, [
-              el('div', { class: 'flex items-baseline gap-2' }, [
-                el('span', { class: 'font-medium text-blue-700' }, [d.authorName || d.author || 'anon']),
-                el('span', { class: 'text-gray-500' }, [new Date(d.createdAt?.toDate?.() || Date.now()).toLocaleString()])
-              ]),
-              el('div', {}, [d.text || ''])
-            ]);
-            commentsWrap.appendChild(item);
-          });
-        });
-
-        // Comment form
-        const form = card.querySelector('[data-field="commentForm"]');
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          if (!currentUser) {
-            alert("Login first!");
-            return;
-          }
-          const data = new FormData(form);
-          const text = (data.get('text') || '').toString().trim();
-          if (!text) return;
-          try {
-            await addDoc(collection(db, 'missions', id, 'comments'), {
-              text,
-              author: currentUser.uid,
-              authorName: currentUser.email || "anon",
-              createdAt: serverTimestamp(),
-            });
-            form.reset();
-          } catch (e2) { alert('Failed to post: ' + (e2?.message || e2)); }
-        });
 
         missionsEl.appendChild(card);
       });
