@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mission Tracker (Category Admins + Superadmin)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <meta name="robots" content="noindex" />
   <style>
     body {
@@ -57,6 +59,7 @@
 
     <div class="flex flex-wrap items-center gap-3 mb-2">
       <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded font-semibold shadow">Add Mission</button>
+      <button id="exportExcelBtn" class="admin-only bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold shadow">Export to Excel</button>
       <div class="ml-auto flex items-center gap-2">
         <span class="text-gray-500">User:</span>
         <span id="userEmailDisplay" class="font-semibold text-blue-700"></span>
@@ -155,6 +158,7 @@
     const adminBadge = document.getElementById('adminBadge');
     const superBadge = document.getElementById('superBadge');
     const addBtn = document.getElementById('addBtn');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
 
     let currentUser = null;
     let isAdmin = false;
@@ -374,6 +378,7 @@
       }
     }
 
+    // FEEDBACK SECTION WITHOUT IMAGE SUPPORT
     function renderFeedbackSection(missionId, cardEl) {
       const feedbackList = cardEl.querySelector('.feedback-list');
       const feedbackInput = cardEl.querySelector('.feedback-input');
@@ -387,7 +392,7 @@
           const data = doc.data();
           const div = document.createElement('div');
           div.className = 'feedback-item';
-          div.innerHTML = `<b>${data.author || 'Anonymous'}:</b> ${data.text}`;
+          div.innerHTML = `<b>${data.author || 'Anonymous'}:</b> ${data.text || ""}`;
           feedbackList.appendChild(div);
         });
       });
@@ -398,6 +403,7 @@
           return;
         }
         if (feedbackInput.value.trim() === '') return;
+
         await addDoc(commentsCol, {
           text: feedbackInput.value,
           author: currentUser ? currentUser.email : 'Anonymous',
@@ -478,6 +484,57 @@
       });
     }
     addBtn.disabled = true;
+
+    // EXPORT TO EXCEL WITH CURRENT DATE IN FILENAME
+    exportExcelBtn.addEventListener('click', async () => {
+      // Only admin/superadmin can export
+      if (!isAdmin && !isSuperAdmin) {
+        alert("Only admins can export!");
+        return;
+      }
+      // Get all missions (filtered by selectedCategory if you want)
+      let rows = [];
+      for (const m of missionsCache) {
+        if (selectedCategory !== "all" && m.category !== selectedCategory) continue;
+        // Get all feedback for each mission
+        let feedbackText = "";
+        const commentsCol = collection(db, 'missions', m.id, 'comments');
+        const commentsSnap = await getDocs(commentsCol);
+        let feedbacks = [];
+        commentsSnap.forEach(docSnap => {
+          const d = docSnap.data();
+          feedbacks.push(d.text ? d.text : "");
+        });
+        feedbackText = feedbacks.join("\n");
+        // One row per mission
+        rows.push({
+          Category: m.category || '',
+          Title: m.title || '',
+          Description: m.description || '',
+          Deadline: m.deadline || '',
+          Status: m.status || '',
+          Creator: m.creator || '',
+          Feedback: feedbackText
+        });
+      }
+      if (rows.length === 0) {
+        alert("No missions to export.");
+        return;
+      }
+      // Create worksheet & workbook
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Missions");
+
+      // Add current date to filename
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      XLSX.writeFile(wb, `missions_${dateStr}.xlsx`);
+    });
+
   </script>
 </body>
 </html>
