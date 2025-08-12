@@ -9,8 +9,7 @@
   <style>
     body {
       min-height: 100vh;
-      background:
-        linear-gradient(180deg, #e8eefe 0%, #ffffff 100%);
+      background: linear-gradient(180deg, #e8eefe 0%, #ffffff 100%);
     }
     #missions:empty::after {
       content: "No missions yet. Click 'Add Mission' to begin.";
@@ -158,21 +157,22 @@
     // Check if user is admin (admins collection: admins/{uid} exists)
     async function checkIfAdmin(uid) {
       try {
-        const docRef = doc(db, "superadmins", uid);
+        const docRef = doc(db, "admins", uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
           allowedCategories = Array.isArray(data.categories) ? data.categories : [];
-          isSuperAdmin = (data.superadmin === true) || (data.email === "admin@admins.com");
-          return true;
+          isSuperAdmin = !!data.superadmin || (data.email === "admin@admins.com");
+          isAdmin = true;
+        } else {
+          allowedCategories = [];
+          isSuperAdmin = false;
+          isAdmin = false;
         }
-        allowedCategories = [];
-        isSuperAdmin = false;
-        return false;
       } catch (e) {
         allowedCategories = [];
         isSuperAdmin = false;
-        return false;
+        isAdmin = false;
       }
     }
 
@@ -195,7 +195,7 @@
         authEmail.classList.add("hidden");
         authPass.classList.add("hidden");
         addBtn.disabled = false;
-        isAdmin = await checkIfAdmin(user.uid);
+        await checkIfAdmin(user.uid);
         updateAdminUI();
         if (isSuperAdmin) {
           authStatus.textContent = "Logged in as: " + user.email + " (Superadmin)";
