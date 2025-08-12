@@ -1,0 +1,101 @@
+<!-- Add to your HTML body for Login/Register -->
+<div id="authBox" class="bg-white p-6 rounded shadow max-w-md w-full mb-8">
+  <h2 class="text-xl font-semibold mb-4">Sign in or Register</h2>
+  <input id="authEmail" type="email" placeholder="Email" class="border p-2 w-full mb-2 rounded" />
+  <input id="authPass" type="password" placeholder="Password" class="border p-2 w-full mb-2 rounded" />
+  <div class="flex gap-2">
+    <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
+    <button id="registerBtn" class="bg-gray-600 text-white px-4 py-2 rounded">Register</button>
+    <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded hidden">Logout</button>
+  </div>
+  <div id="authStatus" class="text-sm text-gray-700 mt-3"></div>
+</div>
+
+<script type="module">
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db } from "./your-firebase-init.js"; // import your db if in separate file
+
+const auth = getAuth();
+
+const authEmail = document.getElementById('authEmail');
+const authPass = document.getElementById('authPass');
+const loginBtn = document.getElementById('loginBtn');
+const registerBtn = document.getElementById('registerBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const authStatus = document.getElementById('authStatus');
+
+let currentUser = null;
+let isAdmin = false;
+
+// Check if user is admin (admins collection: admins/{uid} exists)
+async function checkIfAdmin(uid) {
+  try {
+    const docRef = doc(db, "admins", uid);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists();
+  } catch (e) {
+    return false;
+  }
+}
+
+// Update UI on auth state change
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    authStatus.textContent = "Logged in as: " + (user.email || user.uid);
+    logoutBtn.classList.remove("hidden");
+    loginBtn.classList.add("hidden");
+    registerBtn.classList.add("hidden");
+    authEmail.classList.add("hidden");
+    authPass.classList.add("hidden");
+    isAdmin = await checkIfAdmin(user.uid);
+    if (isAdmin) {
+      authStatus.textContent += " (Admin)";
+      // Show admin-only buttons/features here
+      document.querySelectorAll('.admin-only').forEach(el => el.classList.remove("hidden"));
+    } else {
+      document.querySelectorAll('.admin-only').forEach(el => el.classList.add("hidden"));
+    }
+  } else {
+    currentUser = null;
+    isAdmin = false;
+    authStatus.textContent = "Not logged in.";
+    logoutBtn.classList.add("hidden");
+    loginBtn.classList.remove("hidden");
+    registerBtn.classList.remove("hidden");
+    authEmail.classList.remove("hidden");
+    authPass.classList.remove("hidden");
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.add("hidden"));
+  }
+});
+
+// Login
+loginBtn.onclick = async () => {
+  try {
+    await signInWithEmailAndPassword(auth, authEmail.value, authPass.value);
+    authStatus.textContent = "Logging in...";
+  } catch (e) {
+    authStatus.textContent = "Login failed: " + e.message;
+  }
+};
+
+// Register
+registerBtn.onclick = async () => {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, authEmail.value, authPass.value);
+    // Optionally: Add user to Firestore users collection
+    await setDoc(doc(db, "users", cred.user.uid), {
+      email: cred.user.email,
+      createdAt: new Date()
+    });
+    authStatus.textContent = "Registered!";
+  } catch (e) {
+    authStatus.textContent = "Registration failed: " + e.message;
+  }
+};
+
+// Logout
+logoutBtn.onclick = () => signOut(auth);
+
+</script>
