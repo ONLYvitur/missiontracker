@@ -158,7 +158,7 @@
     // Check if user is admin (admins collection: admins/{uid} exists)
     async function checkIfAdmin(uid) {
       try {
-        const docRef = doc(db, "admins", uid);
+        const docRef = doc(db, "superadmins", uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
