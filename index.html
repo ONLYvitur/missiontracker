@@ -21,6 +21,8 @@
     }
     .admin-only { display: none; }
     .admin-visible { display: inline-block !important; }
+    .feedback-list { max-height: 110px; overflow-y: auto; }
+    .feedback-item { background: #f1f5f9; border-radius: 0.5rem; padding: 0.5rem; margin-bottom: 0.25rem; font-size:0.98em;}
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 flex flex-col items-center py-10 px-4">
@@ -107,6 +109,14 @@
         <div class="flex-shrink-0 space-x-2">
           <button class="edit underline text-blue-600 hover:text-blue-900">Edit</button>
           <button class="delete underline text-red-600 hover:text-red-800 admin-only">Delete</button>
+        </div>
+      </div>
+      <!-- Feedback Section -->
+      <div class="mt-3">
+        <div class="feedback-list text-sm mb-2"></div>
+        <div class="flex gap-1">
+          <input class="feedback-input border p-1 rounded flex-1" type="text" maxlength="300" placeholder="Add feedback..." />
+          <button class="feedback-submit bg-blue-100 text-blue-800 px-2 rounded">Send</button>
         </div>
       </div>
     </div>
@@ -345,18 +355,6 @@
       }
     });
 
-    // Render helper
-    function el(tag, attrs = {}, children = []) {
-      const n = document.createElement(tag);
-      Object.entries(attrs).forEach(([k, v]) => {
-        if (k === 'class') n.className = v;
-        else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
-        else n.setAttribute(k, v);
-      });
-      children.forEach(c => n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
-      return n;
-    }
-
     // Delete mission + all comments (batched) -- only admins for that category or superadmin
     async function deleteMissionAndComments(id, category) {
       if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(category)))) {
@@ -376,6 +374,41 @@
       } catch (err) {
         alert('Delete failed: ' + (err?.message || err));
       }
+    }
+
+    // --- Feedback Logic ---
+    function renderFeedbackSection(missionId, cardEl) {
+      const feedbackList = cardEl.querySelector('.feedback-list');
+      const feedbackInput = cardEl.querySelector('.feedback-input');
+      const feedbackSubmit = cardEl.querySelector('.feedback-submit');
+      feedbackInput.value = "";
+
+      // Listen for comments in real-time
+      const commentsCol = collection(db, 'missions', missionId, 'comments');
+      onSnapshot(commentsCol, (snap) => {
+        feedbackList.innerHTML = '';
+        snap.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement('div');
+          div.className = 'feedback-item';
+          div.innerHTML = `<b>${data.author || 'Anonymous'}:</b> ${data.text}`;
+          feedbackList.appendChild(div);
+        });
+      });
+
+      feedbackSubmit.onclick = async () => {
+        if (!currentUser) {
+          alert("Login to leave feedback.");
+          return;
+        }
+        if (feedbackInput.value.trim() === '') return;
+        await addDoc(commentsCol, {
+          text: feedbackInput.value,
+          author: currentUser ? currentUser.email : 'Anonymous',
+          createdAt: serverTimestamp()
+        });
+        feedbackInput.value = '';
+      };
     }
 
     // Subscribe to missions in real-time
@@ -400,18 +433,19 @@
       filtered.forEach((m) => {
         const id = m.id;
         const card = tpl.content.cloneNode(true);
+        const cardEl = card.children[0];
 
-        card.querySelector('[data-field="category"]').textContent = m.category || '';
-        card.querySelector('[data-field="title"]').textContent = m.title || 'Untitled';
-        card.querySelector('[data-field="description"]').textContent = m.description || '';
+        cardEl.querySelector('[data-field="category"]').textContent = m.category || '';
+        cardEl.querySelector('[data-field="title"]').textContent = m.title || 'Untitled';
+        cardEl.querySelector('[data-field="description"]').textContent = m.description || '';
         const meta = [];
         meta.push('Status: ' + (m.status || 'Pending'));
         meta.push('Deadline: ' + (m.deadline || '—'));
         meta.push('Created by: ' + (m.creator || '—'));
-        card.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
+        cardEl.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
 
         // Edit
-        const editBtn = card.querySelector('.edit');
+        const editBtn = cardEl.querySelector('.edit');
         const canEdit = isSuperAdmin || (isAdmin && allowedCategories.includes(m.category));
         if (canEdit) {
           editBtn.style.display = '';
@@ -437,13 +471,16 @@
         });
 
         // Delete (mission + comments) -- only admins for that category or superadmin
-        const deleteBtn = card.querySelector('.delete');
+        const deleteBtn = cardEl.querySelector('.delete');
         if (canEdit) {
           deleteBtn.classList.add("admin-visible");
         } else {
           deleteBtn.classList.remove("admin-visible");
         }
         deleteBtn.addEventListener('click', () => deleteMissionAndComments(id, m.category));
+
+        // Feedback
+        renderFeedbackSection(id, cardEl);
 
         missionsEl.appendChild(card);
       });
