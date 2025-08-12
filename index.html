@@ -25,21 +25,46 @@
     .mission-card:hover { box-shadow: 0 2px 14px 0 rgba(0,0,0,0.06);}
     #formModal:not(.hidden) { animation: fadeIn 0.15s;}
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .admin-only { display: none; }
+    .admin-visible { display: inline-block !important; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 flex flex-col items-center py-10 px-4">
   <div class="w-full max-w-2xl">
+
     <header class="flex items-center justify-between mb-6">
       <h1 class="text-3xl font-black tracking-tight text-blue-800">Mission Tracker</h1>
-      <!-- Removed userBadge -->
     </header>
+
+    <!-- Auth Box -->
+    <div id="authBox" class="bg-white p-6 rounded shadow max-w-md w-full mb-8">
+      <h2 class="text-xl font-semibold mb-4">Sign in or Register</h2>
+      <input id="authEmail" type="email" placeholder="Email" class="border p-2 w-full mb-2 rounded" autocomplete="username" />
+      <input id="authPass" type="password" placeholder="Password" class="border p-2 w-full mb-2 rounded" autocomplete="current-password" />
+      <div class="flex gap-2 mb-2">
+        <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
+        <button id="registerBtn" class="bg-gray-600 text-white px-4 py-2 rounded">Register</button>
+        <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded hidden">Logout</button>
+      </div>
+      <div id="authStatus" class="text-sm text-gray-700 mt-3"></div>
+    </div>
+
+    <!-- Category Tabs -->
+    <div id="categoryTabs" class="flex gap-2 mb-4">
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-blue-100 text-blue-800" data-cat="all">All</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="תקשוב">תקשוב</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="לוגסטיקה">לוגסטיקה</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="רכב">רכב</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="מטבח">מטבח</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold bg-gray-100 text-gray-700" data-cat="מחנה">מחנה</button>
+    </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-2">
       <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded font-semibold shadow">Add Mission</button>
       <div class="ml-auto flex items-center gap-2">
-        <span class="text-gray-500">You are:</span>
-        <span id="usernameDisplay" class="font-semibold text-blue-700"></span>
-        <button id="changeNameBtn" class="text-xs text-blue-500 underline">Change</button>
+        <span class="text-gray-500">User:</span>
+        <span id="userEmailDisplay" class="font-semibold text-blue-700"></span>
+        <span id="adminBadge" class="admin-only bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">Admin</span>
       </div>
     </div>
 
@@ -50,6 +75,14 @@
   <div id="formModal" class="hidden fixed inset-0 bg-black/50 z-20 flex justify-center items-center">
     <div class="bg-white p-6 rounded shadow max-w-md w-full">
       <h2 class="text-xl font-semibold mb-4" id="formTitle">New Mission</h2>
+      <select id="category" class="border p-2 w-full mb-2 rounded" required>
+        <option value="">Select category</option>
+        <option value="תקשוב">תקשוב</option>
+        <option value="לוגסטיקה">לוגסטיקה</option>
+        <option value="רכב">רכב</option>
+        <option value="מטבח">מטבח</option>
+        <option value="מחנה">מחנה</option>
+      </select>
       <input id="title" placeholder="Title" class="border p-2 w-full mb-2 rounded" />
       <textarea id="description" placeholder="Description" class="border p-2 w-full mb-2 rounded"></textarea>
       <input id="deadline" type="date" class="border p-2 w-full mb-2 rounded" />
@@ -65,30 +98,20 @@
     </div>
   </div>
 
-  <!-- Modal: Username -->
-  <div id="usernameModal" class="hidden fixed inset-0 bg-black/50 z-30 flex justify-center items-center">
-    <div class="bg-white p-7 rounded shadow max-w-xs w-full">
-      <h2 class="text-lg font-semibold mb-4">Set your username</h2>
-      <input id="usernameInput" maxlength="24" placeholder="Choose a username" class="border p-2 w-full mb-3 rounded" />
-      <div class="text-xs text-gray-500 mb-4">This will be visible to others in comments. You can change it anytime.</div>
-      <div class="flex justify-end gap-2">
-        <button id="cancelNameBtn" class="px-3 py-2">Cancel</button>
-        <button id="saveNameBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
-      </div>
-    </div>
-  </div>
-
   <template id="missionCardTpl">
     <div class="mission-card p-5 bg-white rounded shadow transition">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <h3 class="font-bold text-lg truncate" data-field="title">Title</h3>
+          <div class="flex gap-2 items-center mb-1">
+            <span class="inline-block text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-bold" data-field="category"></span>
+            <h3 class="font-bold text-lg truncate" data-field="title">Title</h3>
+          </div>
           <p class="mt-1" data-field="description">Description…</p>
           <p class="mt-1 text-sm text-gray-500" data-field="meta">—</p>
         </div>
         <div class="flex-shrink-0 space-x-2">
           <button class="edit underline text-blue-600 hover:text-blue-900">Edit</button>
-          <button class="delete underline text-red-600 hover:text-red-800">Delete</button>
+          <button class="delete underline text-red-600 hover:text-red-800 admin-only">Delete</button>
         </div>
       </div>
       <!-- Feedback / comments -->
@@ -106,11 +129,11 @@
   <script type="module">
     // --- Firebase SDK (v10) ---
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
     import {
       getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
       onSnapshot, serverTimestamp, query, orderBy,
-      getDocs, writeBatch
+      getDocs, writeBatch, getDoc, setDoc
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
     // --- Your Firebase project ---
@@ -128,83 +151,98 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // --- Auth: sign in anonymously so each user has a uid for comments ---
-    signInAnonymously(auth).catch(console.error);
+    // --- Auth UI and Logic ---
+    const authEmail = document.getElementById('authEmail');
+    const authPass = document.getElementById('authPass');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const authStatus = document.getElementById('authStatus');
+    const userEmailDisplay = document.getElementById('userEmailDisplay');
+    const adminBadge = document.getElementById('adminBadge');
+    const addBtn = document.getElementById('addBtn');
 
-    // --- Username (per IP) ---
-    const usernameKey = "mt_username";
-    const usernameDisplay = document.getElementById('usernameDisplay');
-    const changeNameBtn = document.getElementById('changeNameBtn');
-    const usernameModal = document.getElementById('usernameModal');
-    const usernameInput = document.getElementById('usernameInput');
-    const saveNameBtn = document.getElementById('saveNameBtn');
-    const cancelNameBtn = document.getElementById('cancelNameBtn');
+    let currentUser = null;
+    let isAdmin = false;
 
-    let myUsername = null;
-
-    // Get IP and suggest as default username (anonymous, not reliable for authentication)
-    async function getIPUsernameSuggestion() {
+    // Check if user is admin (admins collection: admins/{uid} exists)
+    async function checkIfAdmin(uid) {
       try {
-        const res = await fetch('https://ipapi.co/json/');
-        const data = await res.json();
-        if (data && data.ip) {
-          return "user-" + data.ip.replace(/\./g, "-");
+        const docRef = doc(db, "admins", uid);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists();
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function updateAdminUI() {
+      document.querySelectorAll('.admin-only').forEach(el => {
+        el.classList.toggle("admin-visible", isAdmin);
+      });
+      adminBadge.classList.toggle("admin-visible", isAdmin);
+    }
+
+    // Auth state listener
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        userEmailDisplay.textContent = user.email;
+        logoutBtn.classList.remove("hidden");
+        loginBtn.classList.add("hidden");
+        registerBtn.classList.add("hidden");
+        authEmail.classList.add("hidden");
+        authPass.classList.add("hidden");
+        addBtn.disabled = false;
+        isAdmin = await checkIfAdmin(user.uid);
+        if (isAdmin) {
+          authStatus.textContent = "Logged in as: " + user.email + " (Admin)";
+        } else {
+          authStatus.textContent = "Logged in as: " + user.email;
         }
-      } catch (e) {}
-      return "user-" + Math.floor(Math.random() * 90000 + 10000);
-    }
-
-    function showUsernameModal(initial = "") {
-      usernameInput.value = initial;
-      usernameModal.classList.remove('hidden');
-      usernameInput.focus();
-    }
-
-    function hideUsernameModal() {
-      usernameModal.classList.add('hidden');
-    }
-
-    function setUsername(name) {
-      myUsername = name.trim().slice(0,24) || "anon";
-      localStorage.setItem(usernameKey, myUsername);
-      usernameDisplay.textContent = myUsername;
-    }
-
-    // Initial username setup
-    async function ensureUsername() {
-      let name = localStorage.getItem(usernameKey);
-      if (!name) {
-        // Suggest IP-based
-        name = await getIPUsernameSuggestion();
-        showUsernameModal(name);
+        updateAdminUI();
       } else {
-        setUsername(name);
+        currentUser = null;
+        userEmailDisplay.textContent = "";
+        logoutBtn.classList.add("hidden");
+        loginBtn.classList.remove("hidden");
+        registerBtn.classList.remove("hidden");
+        authEmail.classList.remove("hidden");
+        authPass.classList.remove("hidden");
+        addBtn.disabled = true;
+        authStatus.textContent = "Not logged in.";
+        isAdmin = false;
+        updateAdminUI();
       }
-    }
-    // Username modal logic
-    saveNameBtn.onclick = () => {
-      // Allow Hebrew, English, numbers, underscore, hyphen, space
-      const val = usernameInput.value.trim().replace(/[^\u0590-\u05FFa-zA-Z0-9_\- ]/g, '').slice(0,24);
-      if (val.length < 2) {
-        alert("Username must be at least 2 characters.");
-        return;
+    });
+
+    // Login
+    loginBtn.onclick = async () => {
+      try {
+        await signInWithEmailAndPassword(auth, authEmail.value, authPass.value);
+        authStatus.textContent = "Logging in...";
+      } catch (e) {
+        authStatus.textContent = "Login failed: " + e.message;
       }
-      setUsername(val);
-      hideUsernameModal();
-    };
-    cancelNameBtn.onclick = () => {
-      if (!localStorage.getItem(usernameKey)) {
-        alert("You must set a username to use the site.");
-        return;
-      }
-      hideUsernameModal();
-    };
-    changeNameBtn.onclick = () => {
-      showUsernameModal(myUsername || "");
     };
 
-    // Run on load
-    await ensureUsername();
+    // Register
+    registerBtn.onclick = async () => {
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, authEmail.value, authPass.value);
+        // Optionally: Add user to Firestore users collection
+        await setDoc(doc(db, "users", cred.user.uid), {
+          email: cred.user.email,
+          createdAt: new Date()
+        });
+        authStatus.textContent = "Registered!";
+      } catch (e) {
+        authStatus.textContent = "Registration failed: " + e.message;
+      }
+    };
+
+    // Logout
+    logoutBtn.onclick = () => signOut(auth);
 
     // --- UI refs ---
     const missionsEl = document.getElementById('missions');
@@ -214,13 +252,29 @@
     const descEl = document.getElementById('description');
     const deadlineEl = document.getElementById('deadline');
     const statusEl = document.getElementById('status');
-    const saveBtn = document.getElementById('saveBtn');
     const cancelBtn = document.getElementById('cancelBtn');
-    const addBtn = document.getElementById('addBtn');
+    const categoryEl = document.getElementById('category');
+    const categoryTabs = document.querySelectorAll('.cat-tab');
 
     let editingId = null; // Firestore doc id when editing
+    let missionsCache = [];
+    let selectedCategory = "all";
+
+    // Category filter
+    categoryTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        categoryTabs.forEach(t => t.classList.remove('bg-blue-100', 'text-blue-800'));
+        tab.classList.add('bg-blue-100', 'text-blue-800');
+        selectedCategory = tab.dataset.cat;
+        renderMissions();
+      });
+    });
 
     function openForm(isEdit = false) {
+      if (!currentUser) {
+        alert("You must be logged in to add or edit missions.");
+        return;
+      }
       formTitle.textContent = isEdit ? 'Edit Mission' : 'New Mission';
       modal.classList.remove('hidden');
     }
@@ -231,23 +285,40 @@
       descEl.value = '';
       deadlineEl.value = '';
       statusEl.value = 'Pending';
+      categoryEl.value = '';
     }
 
     cancelBtn.addEventListener('click', closeForm);
-    addBtn.addEventListener('click', () => openForm(false));
+    addBtn.addEventListener('click', () => {
+      if (!currentUser) {
+        alert("Login first!");
+        return;
+      }
+      openForm(false);
+    });
 
     // --- Firestore collections ---
     const missionsCol = collection(db, 'missions');
 
     // Create or update mission
-    saveBtn.addEventListener('click', async () => {
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      if (!currentUser) {
+        alert("You must be logged in to save a mission.");
+        return;
+      }
       const payload = {
         title: titleEl.value.trim() || 'Untitled',
         description: descEl.value.trim(),
         deadline: deadlineEl.value || null,
         status: statusEl.value,
         updatedAt: serverTimestamp(),
+        category: categoryEl.value || '',
+        creator: currentUser.email || currentUser.uid
       };
+      if (!payload.category) {
+        alert("Please select a category.");
+        return;
+      }
       try {
         if (editingId) {
           await updateDoc(doc(db, 'missions', editingId), payload);
@@ -275,8 +346,12 @@
       return n;
     }
 
-    // Delete mission + all comments (batched)
+    // Delete mission + all comments (batched) -- only admins
     async function deleteMissionAndComments(id) {
+      if (!isAdmin) {
+        alert("Only admins can delete missions.");
+        return;
+      }
       if (!confirm('Delete this mission and all its feedback?')) return;
       try {
         const missionRef = doc(db, 'missions', id);
@@ -288,7 +363,6 @@
         batch.delete(missionRef);
         await batch.commit();
       } catch (err) {
-        console.error('Failed to delete mission/comments:', err);
         alert('Delete failed: ' + (err?.message || err));
       }
     }
@@ -296,31 +370,58 @@
     // Subscribe to missions in real-time
     const qMissions = query(missionsCol, orderBy('createdAt', 'desc'));
     onSnapshot(qMissions, (snap) => {
-      missionsEl.innerHTML = '';
-      const tpl = document.getElementById('missionCardTpl');
+      missionsCache = [];
       snap.forEach((docSnap) => {
         const m = docSnap.data();
         const id = docSnap.id;
+        missionsCache.push({ ...m, id });
+      });
+      renderMissions();
+    });
+
+    function renderMissions() {
+      missionsEl.innerHTML = '';
+      const tpl = document.getElementById('missionCardTpl');
+      let filtered = missionsCache;
+      if (selectedCategory !== "all") {
+        filtered = filtered.filter(m => m.category === selectedCategory);
+      }
+      filtered.forEach((m) => {
+        const id = m.id;
         const card = tpl.content.cloneNode(true);
 
+        card.querySelector('[data-field="category"]').textContent = m.category || '';
         card.querySelector('[data-field="title"]').textContent = m.title || 'Untitled';
         card.querySelector('[data-field="description"]').textContent = m.description || '';
         const meta = [];
         meta.push('Status: ' + (m.status || 'Pending'));
         meta.push('Deadline: ' + (m.deadline || '—'));
+        meta.push('Created by: ' + (m.creator || '—'));
         card.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
 
         // Edit
         card.querySelector('.edit').addEventListener('click', () => {
+          if (!currentUser) {
+            alert("Login first!");
+            return;
+          }
           editingId = id;
           titleEl.value = m.title || '';
           descEl.value = m.description || '';
           deadlineEl.value = m.deadline || '';
           statusEl.value = m.status || 'Pending';
+          categoryEl.value = m.category || '';
           openForm(true);
         });
-        // Delete (mission + comments)
-        card.querySelector('.delete').addEventListener('click', () => deleteMissionAndComments(id));
+
+        // Delete (mission + comments) -- admins only
+        const deleteBtn = card.querySelector('.delete');
+        if (isAdmin) {
+          deleteBtn.classList.add("admin-visible");
+        } else {
+          deleteBtn.classList.remove("admin-visible");
+        }
+        deleteBtn.addEventListener('click', () => deleteMissionAndComments(id));
 
         // Comments live list
         const commentsWrap = card.querySelector('[data-field="comments"]');
@@ -331,7 +432,7 @@
             const d = c.data();
             const item = el('div', { class: 'text-sm' }, [
               el('div', { class: 'flex items-baseline gap-2' }, [
-                el('span', { class: 'font-medium text-blue-700' }, [d.authorName || 'anon']),
+                el('span', { class: 'font-medium text-blue-700' }, [d.authorName || d.author || 'anon']),
                 el('span', { class: 'text-gray-500' }, [new Date(d.createdAt?.toDate?.() || Date.now()).toLocaleString()])
               ]),
               el('div', {}, [d.text || ''])
@@ -344,14 +445,18 @@
         const form = card.querySelector('[data-field="commentForm"]');
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
+          if (!currentUser) {
+            alert("Login first!");
+            return;
+          }
           const data = new FormData(form);
           const text = (data.get('text') || '').toString().trim();
           if (!text) return;
           try {
             await addDoc(collection(db, 'missions', id, 'comments'), {
               text,
-              author: auth.currentUser?.uid || 'anon',
-              authorName: myUsername || "anon",
+              author: currentUser.uid,
+              authorName: currentUser.email || "anon",
               createdAt: serverTimestamp(),
             });
             form.reset();
@@ -360,7 +465,9 @@
 
         missionsEl.appendChild(card);
       });
-    });
+    }
+    // Disable Add Mission if not logged in
+    addBtn.disabled = true;
   </script>
 </body>
 </html>
