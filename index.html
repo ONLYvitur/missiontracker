@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mission Tracker (Online • Firebase)</title>
+  <title>Mission Tracker (Category Admins Example)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <meta name="robots" content="noindex" />
   <style>
@@ -164,14 +164,22 @@
 
     let currentUser = null;
     let isAdmin = false;
+    let allowedCategories = [];
 
     // Check if user is admin (admins collection: admins/{uid} exists)
     async function checkIfAdmin(uid) {
       try {
         const docRef = doc(db, "admins", uid);
         const docSnap = await getDoc(docRef);
-        return docSnap.exists();
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          allowedCategories = Array.isArray(data.categories) ? data.categories : [];
+          return true;
+        }
+        allowedCategories = [];
+        return false;
       } catch (e) {
+        allowedCategories = [];
         return false;
       }
     }
@@ -196,7 +204,7 @@
         addBtn.disabled = false;
         isAdmin = await checkIfAdmin(user.uid);
         if (isAdmin) {
-          authStatus.textContent = "Logged in as: " + user.email + " (Admin)";
+          authStatus.textContent = "Logged in as: " + user.email + " (Admin for: " + allowedCategories.join(", ") + ")";
         } else {
           authStatus.textContent = "Logged in as: " + user.email;
         }
@@ -212,6 +220,7 @@
         addBtn.disabled = true;
         authStatus.textContent = "Not logged in.";
         isAdmin = false;
+        allowedCategories = [];
         updateAdminUI();
       }
     });
@@ -226,8 +235,18 @@
       }
     };
 
-    // Register
+    // Register (only allow emails in this array)
+    const allowedRegisterEmails = [
+      "admin@mission.com",
+      "admin2@mission.com",
+      "example@mission.com"
+    ];
     registerBtn.onclick = async () => {
+      const email = authEmail.value.trim().toLowerCase();
+      if (!allowedRegisterEmails.includes(email)) {
+        authStatus.textContent = "Registration is only allowed for: " + allowedRegisterEmails.join(", ");
+        return;
+      }
       try {
         const cred = await createUserWithEmailAndPassword(auth, authEmail.value, authPass.value);
         // Optionally: Add user to Firestore users collection
@@ -319,6 +338,13 @@
         alert("Please select a category.");
         return;
       }
+
+      // Only allow add/edit if admin for that category
+      if (!allowedCategories.includes(payload.category)) {
+        alert("You are not the admin for category: " + payload.category);
+        return;
+      }
+
       try {
         if (editingId) {
           await updateDoc(doc(db, 'missions', editingId), payload);
@@ -346,10 +372,10 @@
       return n;
     }
 
-    // Delete mission + all comments (batched) -- only admins
-    async function deleteMissionAndComments(id) {
-      if (!isAdmin) {
-        alert("Only admins can delete missions.");
+    // Delete mission + all comments (batched) -- only admins for that category
+    async function deleteMissionAndComments(id, category) {
+      if (!isAdmin || !allowedCategories.includes(category)) {
+        alert("You are not the admin for category: " + category);
         return;
       }
       if (!confirm('Delete this mission and all its feedback?')) return;
@@ -400,9 +426,20 @@
         card.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
 
         // Edit
-        card.querySelector('.edit').addEventListener('click', () => {
+        const editBtn = card.querySelector('.edit');
+        const canEdit = isAdmin && allowedCategories.includes(m.category);
+        if (canEdit) {
+          editBtn.style.display = '';
+        } else {
+          editBtn.style.display = 'none';
+        }
+        editBtn.addEventListener('click', () => {
           if (!currentUser) {
             alert("Login first!");
+            return;
+          }
+          if (!canEdit) {
+            alert("You are not the admin for category: " + m.category);
             return;
           }
           editingId = id;
@@ -414,14 +451,14 @@
           openForm(true);
         });
 
-        // Delete (mission + comments) -- admins only
+        // Delete (mission + comments) -- only admins for that category
         const deleteBtn = card.querySelector('.delete');
-        if (isAdmin) {
+        if (canEdit) {
           deleteBtn.classList.add("admin-visible");
         } else {
           deleteBtn.classList.remove("admin-visible");
         }
-        deleteBtn.addEventListener('click', () => deleteMissionAndComments(id));
+        deleteBtn.addEventListener('click', () => deleteMissionAndComments(id, m.category));
 
         // Comments live list
         const commentsWrap = card.querySelector('[data-field="comments"]');
