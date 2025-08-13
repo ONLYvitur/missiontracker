@@ -92,6 +92,23 @@ let selectedMissions = [];
 let editMissionId = null;
 let currentCategory = "all";
 
+// --- DEADLINE COLOR HELPERS ---
+function getDeadlineColorClass(dueDateStr) {
+  if (!dueDateStr) return '';
+  // today in yyyy-mm-dd
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+  const due = new Date(dueDateStr + 'T23:59:59');
+  const now = new Date();
+  // difference in ms
+  const diff = due - now;
+  const msInDay = 24*60*60*1000;
+  if (dueDateStr < todayStr) return 'deadline-past'; // overdue
+  if (diff < msInDay) return 'deadline-today'; // due today
+  if (diff < 3*msInDay) return 'deadline-soon'; // due in next 3 days
+  return 'deadline-future'; // further away
+}
+
 function renderMissions() {
   const missionsEl = document.getElementById('missions');
   missionsEl.innerHTML = "";
@@ -107,6 +124,9 @@ function renderMissions() {
       allowedCategories = userCategoryPermissions[currentUser.email];
     }
     if (allowedCategories.includes(m.category)) canEditDelete = true;
+
+    const deadlineClass = getDeadlineColorClass(m.due);
+
     missionsEl.innerHTML += `
     <div class="mission-card bg-white p-4 rounded-xl shadow flex flex-col gap-2 border border-gray-100 relative">
       <div class="flex items-center justify-between flex-row-reverse">
@@ -117,7 +137,7 @@ function renderMissions() {
       <div class="flex items-center gap-2 flex-row-reverse">
         <span class="priority-${m.priority} text-xs px-2 py-1 rounded">${m.priority==='high'?'גבוהה':m.priority==='medium'?'בינונית':'נמוכה'}</span>
         <span class="text-gray-500 text-xs">${m.category||''}</span>
-        <span class="text-gray-500 text-xs">${m.due||''}</span>
+        <span class="text-xs ${deadlineClass}">${m.due||''}</span>
       </div>
       ${m.fileURL ? (
         m.fileType && m.fileType.startsWith('image/') ?
