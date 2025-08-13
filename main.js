@@ -356,27 +356,6 @@ document.getElementById('exportExcelBtn').onclick = function() {
   XLSX.writeFile(wb, "משימות.xlsx");
 };
 
-// --- Export to PDF ---
-document.getElementById('exportPdfBtn').onclick = function() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({orientation: "landscape"});
-  let y = 15;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(14);
-  doc.text("רשימת משימות", 140, y, {align:"center"});
-  y += 10;
-  doc.setFontSize(11);
-  missions.forEach((m, i) => {
-    doc.text(
-      `${i+1}. ${m.title} | ${m.desc||""} | קטגוריה: ${m.category||""} | עדיפות: ${m.priority||""} | סטטוס: ${m.status==='archived'?'בארכיון':m.status==='done'?'בוצע':'פעיל'} | תאריך: ${m.due||""}`,
-      10, y, {align:"right"}
-    );
-    y += 8;
-    if (y > 190) { doc.addPage(); y = 15; }
-  });
-  doc.save("משימות.pdf");
-};
-
 // --- Listeners ---
 document.getElementById('searchInput').oninput = filterMissions;
 document.getElementById('priorityFilter').onchange = filterMissions;
