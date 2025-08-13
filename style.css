@@ -32,3 +32,36 @@ body.dark .status-badge.bg-green-200 { background: #166534 !important; color: #d
 body.dark .status-badge.bg-yellow-200 { background: #7c6f1c !important; color:#fef08a !important;}
 body.dark .bg-blue-50 { background: #1e40af !important; color: #dbeafe !important;}
 body.dark .bg-blue-100 { background: #2563eb !important; color: #dbeafe !important;}
+
+#missions { grid-template-columns: 1fr; }
+@media (min-width:640px) { #missions { grid-template-columns: repeat(2,1fr); } }
+@media (min-width:1024px) { #missions { grid-template-columns: repeat(3,1fr); } }
+
+@media (max-width: 640px) {
+  .mission-card { padding: 1rem; margin: 0 0.25rem; }
+  .sticky-header { padding-left: 0.5rem; padding-right: 0.5rem; }
+  #missionModal > div {
+    max-width: 98vw !important;
+    min-width: 0;
+    padding: 0.5rem !important;
+  }
+}
+#missionModal > div {
+  max-height: 98vh;
+  overflow-y: auto;
+}
+input, select, textarea, button {
+  min-height: 2.5rem;
+  font-size: 1.1em;
+}
+#categoryTabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+#categoryTabs > button {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  h1 { font-size: 1.6rem; }
+  .mission-card { font-size: 0.98rem; }
+}
