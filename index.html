@@ -1,152 +1,154 @@
 <!doctype html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mission Tracker (Category Admins + Superadmin)</title>
+  <title>מעקב משימות מתקדם</title>
+  <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS for Excel export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <meta name="robots" content="noindex" />
   <style>
-    body {
-      min-height: 100vh;
-      background: linear-gradient(180deg, #e8eefe 0%, #ffffff 100%);
-    }
-    #missions:empty::after {
-      content: "No missions yet. Click 'Add Mission' to begin.";
-      display: block;
-      color: #999;
-      text-align: center;
-      margin-top: 2rem;
-      font-size: 1.125rem;
-    }
-    .admin-only { display: none; }
-    .admin-visible { display: inline-block !important; }
-    .feedback-list { max-height: 170px; overflow-y: auto; }
-    .feedback-item { background: #f1f5f9; border-radius: 0.5rem; padding: 0.5rem; margin-bottom: 0.25rem; font-size:0.98em;}
-    .modal-fade { transition: opacity 0.2s, transform 0.2s; }
+    html, body { font-family: 'Varela Round', Arial, sans-serif; }
+    body { min-height: 100vh; background: linear-gradient(180deg, #e3f0fc 0%, #ffffff 100%); }
     .rtl { direction: rtl; text-align: right; }
     .ltr { direction: ltr; text-align: left; }
+    .sticky-header { position: sticky; top: 0; z-index: 10; background: #e3f0fc; }
+    .mission-card { transition: box-shadow 0.2s, transform 0.2s; min-width: 260px;}
+    .mission-card:hover { box-shadow: 0 8px 28px 2px #b0c9e1b0; transform: translateY(-2px) scale(1.01);}
+    .input-search { font-size: 1.05em;}
+    .priority-high { color:#fff; background: #e53e3e; }
+    .priority-medium { color:#fff; background: #ecc94b; }
+    .priority-low { color:#fff; background: #38a169; }
+    .progress-bar { height: 0.7rem; border-radius: 8px;}
+    .loader {
+      border: 4px solid #e3e3e3;
+      border-radius: 50%;
+      border-top: 4px solid #3182ce;
+      width: 38px; height: 38px;
+      animation: spin 1s linear infinite;
+      margin: 2rem auto;
+      display:block;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+    body.dark { background: #111827; color: #e5e7eb; }
+    body.dark .bg-white { background: #1f2937 !important; color: #e5e7eb !important; }
+    body.dark .bg-gray-50 { background: #111827 !important; }
+    body.dark .text-blue-800 { color: #60a5fa !important; }
+    body.dark .text-gray-500 { color: #a3a3a3 !important; }
+    body.dark .shadow { box-shadow: 0 2px 12px #0009 !important; }
+    body.dark input, body.dark select, body.dark textarea { background: #334155 !important; color: #e5e7eb !important; }
+    body.dark .status-badge.bg-gray-200 { background: #374151 !important;}
+    body.dark .status-badge.bg-green-200 { background: #166534 !important; color: #d1fae5 !important;}
+    body.dark .status-badge.bg-yellow-200 { background: #7c6f1c !important; color:#fef08a !important;}
+    body.dark .bg-blue-50 { background: #1e40af !important; color: #dbeafe !important;}
+    body.dark .bg-blue-100 { background: #2563eb !important; color: #dbeafe !important;}
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 flex flex-col items-center py-10 px-4">
-  <div class="w-full max-w-2xl">
-
-    <header class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-black tracking-tight text-blue-800">Mission Tracker</h1>
-    </header>
-
-    <!-- Auth Box -->
-    <div id="authBox" class="bg-white p-6 rounded shadow max-w-md w-full mb-8">
-      <h2 class="text-xl font-semibold mb-4">Sign in or Register</h2>
-      <input id="authEmail" type="email" placeholder="Email" class="border p-2 w-full mb-2 rounded" autocomplete="username" />
-      <input id="authPass" type="password" placeholder="Password" class="border p-2 w-full mb-2 rounded" autocomplete="current-password" />
-      <div class="flex gap-2 mb-2">
-        <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
-        <button id="registerBtn" class="bg-gray-600 text-white px-4 py-2 rounded">Register</button>
-        <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded hidden">Logout</button>
+<body class="bg-gray-50 text-gray-800 flex flex-col items-center py-3 px-1">
+  <button id="darkToggle" class="fixed top-2 left-3 z-50 rounded-full bg-white dark:bg-gray-800 shadow p-2 transition hover:bg-blue-100" title="מצב כהה/בהיר">
+    <span id="darkIcon">🌙</span>
+  </button>
+  <div class="w-full max-w-7xl">
+    <header class="flex items-center justify-between mb-4 flex-row-reverse sticky-header shadow-md py-3 px-2 rounded-xl">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight text-blue-800 text-right mb-0">מעקב משימות מתקדם</h1>
+        <div class="text-base text-gray-500 mt-1" id="personalGreeting"></div>
       </div>
-      <div id="authStatus" class="text-sm text-gray-700 mt-3"></div>
+      <span id="avatarWrap">
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="rounded-full border shadow w-12 h-12 object-cover" id="avatar" alt="אוואטר"/>
+        <input type="file" id="avatarUpload" class="hidden" accept="image/*"/>
+      </span>
+    </header>
+    <div id="authBox" class="bg-white p-6 rounded-xl shadow max-w-md w-full mb-8">
+      <h2 class="text-xl font-semibold mb-4 text-right">התחברות / הרשמה</h2>
+      <input id="authEmail" type="email" placeholder="אימייל" class="border p-2 w-full mb-2 rounded text-right" autocomplete="username" />
+      <input id="authPass" type="password" placeholder="סיסמה" class="border p-2 w-full mb-2 rounded text-right" autocomplete="current-password" />
+      <div class="flex gap-2 mb-2 flex-row-reverse">
+        <button id="loginBtn" class="bg-blue-600 text-white px-4 py-2 rounded">התחבר</button>
+        <button id="registerBtn" class="bg-gray-600 text-white px-4 py-2 rounded">הרשם</button>
+        <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded hidden">התנתק</button>
+      </div>
+      <div id="authStatus" class="text-sm text-gray-700 mt-3 text-right"></div>
     </div>
-
-    <!-- Category Tabs -->
-    <div id="categoryTabs" class="flex gap-2 mb-4">
-      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="all">All</button>
+    <div class="flex flex-col md:flex-row gap-2 mb-4 items-center justify-between flex-row-reverse">
+      <input id="searchInput" placeholder="חיפוש משימה..." class="border input-search p-2 w-full rounded text-right shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition md:w-72"/>
+      <select id="priorityFilter" class="border rounded p-2 text-right">
+        <option value="">סנן לפי עדיפות</option>
+        <option value="high">גבוהה</option>
+        <option value="medium">בינונית</option>
+        <option value="low">נמוכה</option>
+      </select>
+      <button id="bulkArchiveBtn" class="bg-yellow-200 hover:bg-yellow-300 text-yellow-900 font-bold px-4 py-2 rounded-xl shadow transition hidden">ארכוב נבחרים</button>
+      <button id="bulkDeleteBtn" class="bg-red-200 hover:bg-red-300 text-red-900 font-bold px-4 py-2 rounded-xl shadow transition hidden">מחיקה נבחרים</button>
+      <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded-xl font-semibold shadow">הוסף משימה</button>
+      <button id="exportExcelBtn" class="admin-only bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold shadow">ייצא לאקסל</button>
+      <button id="exportPdfBtn" class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded font-semibold shadow">PDF</button>
+      <button id="logoutBtnHeader" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded shadow font-bold">התנתק</button>
+    </div>
+    <div id="categoryTabs" class="flex gap-2 flex-row-reverse mb-4">
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="all">הכל</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="תקשוב">תקשוב</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="לוגיסטיקה">לוגיסטיקה</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="רכב">רכב</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="מטבח">מטבח</button>
       <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="מחנה">מחנה</button>
+      <button class="cat-tab px-4 py-2 rounded font-semibold" data-cat="archive">ארכיון</button>
     </div>
-
-    <div class="flex flex-wrap items-center gap-3 mb-2">
-      <button id="addBtn" class="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded font-semibold shadow">Add Mission</button>
-      <button id="exportExcelBtn" class="admin-only bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold shadow">Export to Excel</button>
-      <div class="ml-auto flex items-center gap-2">
-        <span class="text-gray-500">User:</span>
-        <span id="userEmailDisplay" class="font-semibold text-blue-700"></span>
-        <span id="adminBadge" class="admin-only bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">Admin</span>
-        <span id="superBadge" class="admin-only bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">Superadmin</span>
-      </div>
-    </div>
-
-    <div id="missions" class="mt-6 grid gap-5"></div>
-  </div>
-
-  <!-- Modal: Create / Edit Mission -->
-  <div id="formModal" class="hidden fixed inset-0 bg-black/50 z-20 flex justify-center items-center">
-    <div class="bg-white p-6 rounded shadow max-w-md w-full">
-      <h2 class="text-xl font-semibold mb-4" id="formTitle">New Mission</h2>
-      <select id="category" class="border p-2 w-full mb-2 rounded" required>
-        <option value="">Select category</option>
-        <option value="תקשוב">תקשוב</option>
-        <option value="לוגיסטיקה">לוגיסטיקה</option>
-        <option value="רכב">רכב</option>
-        <option value="מטבח">מטבח</option>
-        <option value="מחנה">מחנה</option>
-      </select>
-      <input id="title" placeholder="Title" class="border p-2 w-full mb-2 rounded" />
-      <textarea id="description" placeholder="Description" class="border p-2 w-full mb-2 rounded"></textarea>
-      <input id="deadline" type="date" class="border p-2 w-full mb-2 rounded" />
-      <select id="status" class="border p-2 w-full mb-4 rounded">
-        <option>Pending</option>
-        <option>In Progress</option>
-        <option>Complete</option>
-      </select>
-      <div class="flex justify-end gap-2">
-        <button id="cancelBtn" class="px-4 py-2">Cancel</button>
-        <button id="saveBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
-      </div>
+    <div id="missionsWrap" class="mt-6">
+      <div id="loader" class="loader"></div>
+      <div id="missions" class="grid gap-5"></div>
     </div>
   </div>
-
-  <!-- Modal: Feedback -->
-  <div id="feedbackModal" class="hidden fixed inset-0 bg-black/30 z-30 flex justify-center items-center">
-    <div class="modal-fade bg-white p-6 rounded shadow max-w-md w-full relative" style="min-width:320px;">
-      <button id="closeFeedbackModal" class="absolute top-2 right-3 text-gray-400 hover:text-red-500 text-2xl font-bold">&times;</button>
-      <h2 class="text-lg font-bold mb-2 text-blue-700">משוב למשימה</h2>
-      <div class="feedback-list text-sm mb-3"></div>
-      <div class="flex gap-1">
-        <input class="feedback-input border p-2 rounded flex-1 transition-all" type="text" maxlength="300" placeholder="הוסף משוב..." autocomplete="off" />
-        <button class="feedback-submit bg-blue-100 text-blue-800 px-4 rounded font-semibold">Send</button>
-      </div>
-    </div>
-  </div>
-
-  <template id="missionCardTpl">
-    <div class="mission-card p-5 bg-white rounded shadow transition">
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <div class="flex gap-2 items-center mb-1">
-            <span class="inline-block text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-bold" data-field="category"></span>
-            <h3 class="font-bold text-lg break-words whitespace-normal" data-field="title">Title</h3>
-            <span class="status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2" data-field="status"></span>
+    <!-- Mission Modal (with chat inside, feedback removed) -->
+    <div id="missionModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+      <div class="bg-white dark:bg-gray-900 dark:text-gray-100 p-6 rounded-xl max-w-lg w-full shadow-xl relative">
+        <button class="absolute left-5 top-5 text-lg text-gray-500 hover:text-red-500" onclick="document.getElementById('missionModal').classList.add('hidden')">✕</button>
+        <h2 id="modalTitle" class="text-xl font-bold mb-2 text-right">משימה חדשה</h2>
+        <form id="missionForm" class="space-y-3">
+          <input id="mTitle" type="text" required class="border rounded p-2 w-full text-right" placeholder="כותרת משימה">
+          <textarea id="mDesc" class="border rounded p-2 w-full text-right" placeholder="תיאור"></textarea>
+          <input id="mDue" type="date" class="border rounded p-2 w-full text-right">
+          <select id="mCategory" class="border rounded p-2 w-full text-right">
+            <!-- options built dynamically in JS -->
+          </select>
+          <select id="mPriority" class="border rounded p-2 w-full text-right">
+            <option value="">עדיפות</option>
+            <option value="high">גבוהה</option>
+            <option value="medium">בינונית</option>
+            <option value="low">נמוכה</option>
+          </select>
+          <input id="mAssignee" type="text" class="border rounded p-2 w-full text-right" placeholder="משויך ל...">
+          <div>
+            <label class="font-bold">צ'קליסט</label>
+            <textarea id="mChecklist" class="border rounded p-2 w-full text-right" placeholder="כל שורה=סעיף"></textarea>
           </div>
-          <p class="mt-1" data-field="description">Description…</p>
-          <p class="mt-1 text-sm text-gray-500" data-field="meta">—</p>
+          <div>
+            <label class="font-bold">העלה קובץ</label>
+            <input id="mFile" type="file" class="border rounded p-2 w-full text-right">
+          </div>
+          <div class="flex items-center gap-2 flex-row-reverse">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">שמור</button>
+            <button type="button" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded" onclick="document.getElementById('missionModal').classList.add('hidden')">ביטול</button>
+          </div>
+        </form>
+        <!-- Chat section inside mission modal -->
+        <div class="mt-6">
+          <h3 class="text-lg font-bold mb-2 text-right">צ'אט משימה</h3>
+          <div id="chatMessages" class="flex-1 overflow-y-auto mb-3 border rounded p-2 bg-gray-50 dark:bg-gray-800" style="max-height:150px"></div>
+          <form id="chatForm" class="flex gap-2 flex-row-reverse">
+            <input id="chatInput" type="text" required class="border rounded p-2 flex-1 text-right" placeholder="כתוב הודעה...">
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">שלח</button>
+          </form>
         </div>
-        <div class="flex-shrink-0 space-x-2">
-          <button class="edit underline text-blue-600 hover:text-blue-900">Edit</button>
-          <button class="delete underline text-red-600 hover:text-red-800 admin-only">Delete</button>
-        </div>
-      </div>
-      <!-- Feedback Button -->
-      <div class="mt-4 flex justify-end">
-        <button class="open-feedback-btn bg-gray-100 hover:bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm font-semibold transition">משוב</button>
       </div>
     </div>
-  </template>
-
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-    import {
-      getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
-      onSnapshot, serverTimestamp, query, orderBy,
-      getDocs, writeBatch, getDoc, setDoc
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
+    <script>
+    // ---- Firebase Config ----
     const firebaseConfig = {
       apiKey: "AIzaSyA7B7rovUIpikVGepAqQI2s3Y_xePEwkSA",
       authDomain: "missiontracker-52bb7.firebaseapp.com",
@@ -156,482 +158,357 @@
       appId: "1:1029768338042:web:23b2a0539e0aab53daf9c3",
       measurementId: "G-TNVPW8RETF"
     };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    // ---- Category Permissions ----
+    // Map emails to allowed categories
+    const allCategories = ["תקשוב", "לוגיסטיקה", "רכב", "מטבח", "מחנה"];
+    const userCategoryPermissions = {
+      "matanel@mission.com": ["מחנה"],
+      "anan@mission.com": ["תקשוב"],
+      "hagai@mission.com": ["מטבח"],
+      "walla@mission.com": ["רכב"],
+      "yosef@mission.com": ["לוגיסטיקה"],
+      "kfir@mission.com": allCategories
+    };
 
-    const authEmail = document.getElementById('authEmail');
-    const authPass = document.getElementById('authPass');
-    const loginBtn = document.getElementById('loginBtn');
-    const registerBtn = document.getElementById('registerBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const authStatus = document.getElementById('authStatus');
-    const userEmailDisplay = document.getElementById('userEmailDisplay');
-    const adminBadge = document.getElementById('adminBadge');
-    const superBadge = document.getElementById('superBadge');
-    const addBtn = document.getElementById('addBtn');
-    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    // ---- Dark Mode ----
+    (function(){
+      const darkToggle = document.getElementById('darkToggle');
+      darkToggle.onclick = function() {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('task_dark', document.body.classList.contains('dark') ? '1' : '0');
+        document.getElementById('darkIcon').textContent = document.body.classList.contains('dark') ? "☀️" : "🌙";
+      };
+      if(localStorage.getItem('task_dark') === '1') {
+        document.body.classList.add('dark');
+        document.getElementById('darkIcon').textContent = "☀️";
+      }
+    })();
 
+    // ---- Auth ----
     let currentUser = null;
-    let isAdmin = false;
-    let isSuperAdmin = false;
-    let allowedCategories = [];
-
-    // Deadline formatting helpers
-    function formatDeadline(dateStr) {
-      if (!dateStr) return '—';
-      const date = new Date(dateStr);
-      if (isNaN(date)) return dateStr;
-      return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    function updateAuthUI(user) {
+      currentUser = user;
+      document.getElementById('authBox').style.display = user ? 'none' : '';
+      document.getElementById('logoutBtn').classList.toggle('hidden', !user);
+      document.getElementById('logoutBtnHeader').classList.toggle('hidden', !user);
+      document.getElementById('personalGreeting').textContent = user ? `שלום, ${user.email || user.displayName || "משתמש"}!` : '';
+      if(user && user.photoURL) document.getElementById('avatar').src = user.photoURL;
+      if(user) loadMissions();
     }
-    function deadlineStatusClass(dateStr) {
-      if (!dateStr) return 'text-gray-500';
-      const now = new Date();
-      const date = new Date(dateStr);
-      const diff = (date - now) / (1000 * 60 * 60 * 24); // days
-      if (diff < 0) return 'text-red-600 font-bold'; // overdue
-      if (diff <= 3) return 'text-orange-600 font-semibold'; // soon
-      return 'text-green-700 font-semibold';
-    }
+    auth.onAuthStateChanged(updateAuthUI);
 
-    async function checkIfAdmin(uid) {
+    document.getElementById('loginBtn').onclick = async ()=>{
+      let email = document.getElementById('authEmail').value;
+      let pass = document.getElementById('authPass').value;
       try {
-        const docRef = doc(db, "admins", uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          allowedCategories = Array.isArray(data.categories) ? data.categories : [];
-          isSuperAdmin = !!data.superadmin || (data.email === "admin@admins.com");
-          isAdmin = true;
-        } else {
-          allowedCategories = [];
-          isSuperAdmin = false;
-          isAdmin = false;
-        }
-      } catch (e) {
-        allowedCategories = [];
-        isSuperAdmin = false;
-        isAdmin = false;
-      }
-    }
-
-    function updateAdminUI() {
-      document.querySelectorAll('.admin-only').forEach(el => {
-        el.classList.toggle("admin-visible", isAdmin);
-      });
-      adminBadge.classList.toggle("admin-visible", isAdmin && !isSuperAdmin);
-      superBadge.classList.toggle("admin-visible", isSuperAdmin);
-    }
-
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        currentUser = user;
-        userEmailDisplay.textContent = user.email;
-        logoutBtn.classList.remove("hidden");
-        loginBtn.classList.add("hidden");
-        registerBtn.classList.add("hidden");
-        authEmail.classList.add("hidden");
-        authPass.classList.add("hidden");
-        addBtn.disabled = false;
-        await checkIfAdmin(user.uid);
-        updateAdminUI();
-        if (isSuperAdmin) {
-          authStatus.textContent = "Logged in as: " + user.email + " (Superadmin)";
-        } else if (isAdmin) {
-          authStatus.textContent = "Logged in as: " + user.email + " (Admin for: " + allowedCategories.join(", ") + ")";
-        } else {
-          authStatus.textContent = "Logged in as: " + user.email;
-        }
-      } else {
-        currentUser = null;
-        userEmailDisplay.textContent = "";
-        logoutBtn.classList.add("hidden");
-        loginBtn.classList.remove("hidden");
-        registerBtn.classList.remove("hidden");
-        authEmail.classList.remove("hidden");
-        authPass.classList.remove("hidden");
-        addBtn.disabled = true;
-        authStatus.textContent = "Not logged in.";
-        isAdmin = false;
-        isSuperAdmin = false;
-        allowedCategories = [];
-        updateAdminUI();
-      }
-    });
-
-    loginBtn.onclick = async () => {
-      try {
-        await signInWithEmailAndPassword(auth, authEmail.value, authPass.value);
-        authStatus.textContent = "Logging in...";
-      } catch (e) {
-        authStatus.textContent = "Login failed: " + e.message;
+        await auth.signInWithEmailAndPassword(email, pass);
+      } catch(e) {
+        document.getElementById('authStatus').textContent = "שגיאה: "+e.message;
       }
     };
-
-    registerBtn.onclick = async () => {
+    document.getElementById('registerBtn').onclick = async ()=>{
+      let email = document.getElementById('authEmail').value;
+      let pass = document.getElementById('authPass').value;
       try {
-        const cred = await createUserWithEmailAndPassword(auth, authEmail.value, authPass.value);
-        await setDoc(doc(db, "users", cred.user.uid), {
-          email: cred.user.email,
-          createdAt: new Date()
-        });
-        authStatus.textContent = "Registered!";
-      } catch (e) {
-        authStatus.textContent = "Registration failed: " + e.message;
+        await auth.createUserWithEmailAndPassword(email, pass);
+      } catch(e) {
+        document.getElementById('authStatus').textContent = "שגיאה: "+e.message;
       }
     };
+    document.getElementById('logoutBtn').onclick = ()=>auth.signOut();
+    document.getElementById('logoutBtnHeader').onclick = ()=>auth.signOut();
 
-    logoutBtn.onclick = () => signOut(auth);
-
-    const missionsEl = document.getElementById('missions');
-    const modal = document.getElementById('formModal');
-    const formTitle = document.getElementById('formTitle');
-    const titleEl = document.getElementById('title');
-    const descEl = document.getElementById('description');
-    const deadlineEl = document.getElementById('deadline');
-    const statusEl = document.getElementById('status');
-    const cancelBtn = document.getElementById('cancelBtn');
-    const categoryEl = document.getElementById('category');
-    const categoryTabs = document.querySelectorAll('.cat-tab');
-
-    // Feedback modal elements
-    const feedbackModal = document.getElementById('feedbackModal');
-    const closeFeedbackModal = document.getElementById('closeFeedbackModal');
-    let feedbackListDiv = null;
-    let feedbackInput = null;
-    let feedbackSubmit = null;
-    let activeMissionId = null;
-    let feedbackUnsub = null;
-
-    closeFeedbackModal.onclick = () => {
-      feedbackModal.classList.add('hidden');
-      activeMissionId = null;
-      if (feedbackUnsub) feedbackUnsub();
+    // Avatar upload
+    document.getElementById('avatar').onclick = ()=>document.getElementById('avatarUpload').click();
+    document.getElementById('avatarUpload').onchange = async function(e) {
+      if(!currentUser) return;
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(evt) {
+        await currentUser.updateProfile({ photoURL: evt.target.result });
+        document.getElementById('avatar').src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
     };
 
-    window.addEventListener('keydown', (e) => {
-      if (!feedbackModal.classList.contains('hidden') && e.key === "Escape") closeFeedbackModal.onclick();
-    });
-
-    let editingId = null;
-    let missionsCache = [];
-    let selectedCategory = "all";
-
-    function updateCategoryHighlight() {
-      categoryTabs.forEach(tab => {
-        if (tab.dataset.cat === selectedCategory) {
-          tab.classList.add('bg-blue-100', 'text-blue-800');
-          tab.classList.remove('bg-gray-100', 'text-gray-700');
-        } else {
-          tab.classList.remove('bg-blue-100', 'text-blue-800');
-          tab.classList.add('bg-gray-100', 'text-gray-700');
-        }
-      });
-    }
-
-    categoryTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        selectedCategory = tab.dataset.cat;
-        updateCategoryHighlight();
-        renderMissions();
-      });
-    });
-    updateCategoryHighlight();
-
-    function openForm(isEdit = false) {
-      if (!currentUser) {
-        alert("You must be logged in to add or edit missions.");
-        return;
-      }
-      formTitle.textContent = isEdit ? 'Edit Mission' : 'New Mission';
-      modal.classList.remove('hidden');
-    }
-    function closeForm() {
-      modal.classList.add('hidden');
-      editingId = null;
-      titleEl.value = '';
-      descEl.value = '';
-      deadlineEl.value = '';
-      statusEl.value = 'Pending';
-      categoryEl.value = '';
-    }
-
-    cancelBtn.addEventListener('click', closeForm);
-    addBtn.addEventListener('click', () => {
-      if (!currentUser) {
-        alert("Login first!");
-        return;
-      }
-      openForm(false);
-    });
-
-    const missionsCol = collection(db, 'missions');
-
-    document.getElementById('saveBtn').addEventListener('click', async () => {
-      if (!currentUser) {
-        alert("You must be logged in to save a mission.");
-        return;
-      }
-      const payload = {
-        title: titleEl.value.trim() || 'Untitled',
-        description: descEl.value.trim(),
-        deadline: deadlineEl.value || null,
-        status: statusEl.value,
-        updatedAt: serverTimestamp(),
-        category: categoryEl.value || '',
-        creator: currentUser.email || currentUser.uid
-      };
-      if (!payload.category) {
-        alert("Please select a category.");
-        return;
-      }
-
-      if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(payload.category)))) {
-        alert("You are not the admin for category: " + payload.category);
-        return;
-      }
-
-      try {
-        if (editingId) {
-          await updateDoc(doc(db, 'missions', editingId), payload);
-        } else {
-          await addDoc(missionsCol, {
-            ...payload,
-            createdAt: serverTimestamp(),
-          });
-        }
-        closeForm();
-      } catch (e) {
-        alert('Failed to save mission: ' + e.message);
-      }
-    });
-
-    async function deleteMissionAndComments(id, category) {
-      if (!(isSuperAdmin || (isAdmin && allowedCategories.includes(category)))) {
-        alert("You are not the admin for category: " + category);
-        return;
-      }
-      if (!confirm('Delete this mission and all its feedback?')) return;
-      try {
-        const missionRef = doc(db, 'missions', id);
-        const commentsRef = collection(missionRef, 'comments');
-        const commentsSnap = await getDocs(commentsRef);
-
-        const batch = writeBatch(db);
-        commentsSnap.forEach(c => batch.delete(c.ref));
-        batch.delete(missionRef);
-        await batch.commit();
-      } catch (err) {
-        alert('Delete failed: ' + (err?.message || err));
-      }
-    }
-
-    // Feedback Modal with RTL/LTR detection
-    function openFeedbackModal(missionId) {
-      feedbackModal.classList.remove('hidden');
-      activeMissionId = missionId;
-      feedbackListDiv = feedbackModal.querySelector('.feedback-list');
-      feedbackInput = feedbackModal.querySelector('.feedback-input');
-      feedbackSubmit = feedbackModal.querySelector('.feedback-submit');
-      feedbackInput.value = '';
-      feedbackInput.classList.remove('rtl','ltr');
-      feedbackInput.focus();
-
-      // Real-time feedback list
-      if (feedbackUnsub) feedbackUnsub();
-      const commentsCol = collection(db, 'missions', missionId, 'comments');
-      feedbackUnsub = onSnapshot(commentsCol, (snap) => {
-        feedbackListDiv.innerHTML = '';
-        const items = [];
-        snap.forEach(doc => {
-          const data = doc.data();
-          // RTL/LTR per feedback
-          const isHebrew = /[\u0590-\u05FF]/.test(data.text || "");
-          const div = document.createElement('div');
-          div.className = 'feedback-item ' + (isHebrew ? 'rtl' : 'ltr');
-          div.innerHTML = `<b>${data.author || 'Anonymous'}:</b> ${data.text || ""}`;
-          items.push(div);
-        });
-        items.reverse(); // Recent last
-        items.forEach(div=>feedbackListDiv.appendChild(div));
-        feedbackListDiv.scrollTop = feedbackListDiv.scrollHeight;
-      });
-
-      // RTL/LTR detection on input
-      feedbackInput.oninput = () => {
-        const val = feedbackInput.value;
-        if (/[\u0590-\u05FF]/.test(val)) {
-          feedbackInput.classList.add('rtl');
-          feedbackInput.classList.remove('ltr');
-        } else {
-          feedbackInput.classList.remove('rtl');
-          feedbackInput.classList.add('ltr');
-        }
-      };
-      feedbackInput.oninput();
-
-      // Enter to send
-      feedbackInput.onkeydown = (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          feedbackSubmit.click();
-        }
-      };
-
-      feedbackSubmit.onclick = async () => {
-        if (!currentUser) {
-          alert("Login to leave feedback.");
-          return;
-        }
-        if (feedbackInput.value.trim() === '') return;
-        await addDoc(commentsCol, {
-          text: feedbackInput.value,
-          author: currentUser ? currentUser.email : 'Anonymous',
-          createdAt: serverTimestamp()
-        });
-        feedbackInput.value = '';
-        feedbackInput.oninput();
-      };
-    }
-
-    const qMissions = query(missionsCol, orderBy('createdAt', 'desc'));
-    onSnapshot(qMissions, (snap) => {
-      missionsCache = [];
-      snap.forEach((docSnap) => {
-        const m = docSnap.data();
-        const id = docSnap.id;
-        missionsCache.push({ ...m, id });
-      });
-      renderMissions();
-    });
+    // ---- Missions Data & UI ----
+    let missions = [];
+    let filteredMissions = [];
+    let selectedMissions = [];
+    let editMissionId = null;
+    let currentCategory = "all";
 
     function renderMissions() {
-      missionsEl.innerHTML = '';
-      const tpl = document.getElementById('missionCardTpl');
-      let filtered = missionsCache;
-      if (selectedCategory !== "all") {
-        filtered = filtered.filter(m => m.category === selectedCategory);
+      const missionsEl = document.getElementById('missions');
+      missionsEl.innerHTML = "";
+      if(filteredMissions.length === 0) {
+        missionsEl.innerHTML = `<div class="text-center text-gray-400 mt-10">אין משימות לתצוגה</div>`;
+        return;
       }
-      filtered.forEach((m) => {
-        const id = m.id;
-        const card = tpl.content.cloneNode(true);
-        const cardEl = card.children[0];
-
-        cardEl.querySelector('[data-field="category"]').textContent = m.category || '';
-        cardEl.querySelector('[data-field="title"]').textContent = m.title || 'Untitled';
-        cardEl.querySelector('[data-field="description"]').textContent = m.description || '';
-
-        // DEADLINE visually improved
-        const meta = [];
-        const deadlineFormatted = formatDeadline(m.deadline);
-        const deadlineClass = deadlineStatusClass(m.deadline);
-        meta.push(`<span class="${deadlineClass}">📅 ${deadlineFormatted}</span>`);
-        meta.push('Created by: ' + (m.creator || '—'));
-        cardEl.querySelector('[data-field="meta"]').innerHTML = meta.join(' | ');
-
-        // Status badge color
-        const statusBadge = cardEl.querySelector('.status-badge');
-        statusBadge.textContent = m.status || 'Pending';
-        if (m.status === "Complete") {
-          statusBadge.className = 'status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2 bg-green-200 text-green-900';
-        } else if (m.status === "In Progress") {
-          statusBadge.className = 'status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2 bg-yellow-200 text-yellow-900';
-        } else { // Pending or anything else
-          statusBadge.className = 'status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2 bg-gray-200 text-gray-900';
+      filteredMissions.forEach(m => {
+        // Permission check for edit/delete
+        let allowedCategories = allCategories;
+        let canEditDelete = false;
+        if (currentUser && userCategoryPermissions[currentUser.email]) {
+          allowedCategories = userCategoryPermissions[currentUser.email];
         }
-
-        const editBtn = cardEl.querySelector('.edit');
-        const canEdit = isSuperAdmin || (isAdmin && allowedCategories.includes(m.category));
-        if (canEdit) {
-          editBtn.style.display = '';
-        } else {
-          editBtn.style.display = 'none';
-        }
-        editBtn.addEventListener('click', () => {
-          if (!currentUser) {
-            alert("Login first!");
-            return;
-          }
-          if (!canEdit) {
-            alert("You are not the admin for category: " + m.category);
-            return;
-          }
-          editingId = id;
-          titleEl.value = m.title || '';
-          descEl.value = m.description || '';
-          deadlineEl.value = m.deadline || '';
-          statusEl.value = m.status || 'Pending';
-          categoryEl.value = m.category || '';
-          openForm(true);
-        });
-
-        const deleteBtn = cardEl.querySelector('.delete');
-        if (canEdit) {
-          deleteBtn.classList.add("admin-visible");
-        } else {
-          deleteBtn.classList.remove("admin-visible");
-        }
-        deleteBtn.addEventListener('click', () => deleteMissionAndComments(id, m.category));
-
-        // Feedback modal button
-        cardEl.querySelector('.open-feedback-btn').onclick = () => openFeedbackModal(id);
-
-        missionsEl.appendChild(card);
+        if (allowedCategories.includes(m.category)) canEditDelete = true;
+        missionsEl.innerHTML += `
+        <div class="mission-card bg-white p-4 rounded-xl shadow flex flex-col gap-2 border border-gray-100 relative">
+          <div class="flex items-center justify-between flex-row-reverse">
+            <span class="text-lg font-bold">${m.title}</span>
+            <span class="text-xs px-2 py-1 rounded status-badge ${m.status==='done'?'bg-green-200':'bg-gray-200'}">${m.status==='done'?'בוצע': (m.status==='archived'?'בארכיון':'פעיל')}</span>
+          </div>
+          <div class="text-sm text-gray-600">${m.desc||''}</div>
+          <div class="flex items-center gap-2 flex-row-reverse">
+            <span class="priority-${m.priority} text-xs px-2 py-1 rounded">${m.priority==='high'?'גבוהה':m.priority==='medium'?'בינונית':'נמוכה'}</span>
+            <span class="text-gray-500 text-xs">${m.category||''}</span>
+            <span class="text-gray-500 text-xs">${m.due||''}</span>
+          </div>
+          <div class="flex items-center gap-2 flex-row-reverse mt-2">
+            ${canEditDelete ? `<button onclick="editMission('${m.id}')" class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">ערוך</button>
+            <button onclick="archiveMission('${m.id}')" class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">${m.status==='archived'?'מחק סופית':'העבר לארכיון'}</button>` : ''}
+            <button onclick="openMissionChat('${m.id}')" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">צ'אט</button>
+          </div>
+        </div>
+        `;
       });
     }
-    addBtn.disabled = true;
 
-    // EXPORT TO EXCEL WITH CURRENT DATE IN FILENAME
-    exportExcelBtn.addEventListener('click', async () => {
-      // Only admin/superadmin can export
-      if (!isAdmin && !isSuperAdmin) {
-        alert("Only admins can export!");
+    function filterMissions() {
+      const search = document.getElementById('searchInput').value.trim();
+      const priority = document.getElementById('priorityFilter').value;
+      filteredMissions = missions.filter(m=>{
+        let matches = true;
+        if(currentCategory !== "all" && currentCategory !== "archive")
+          matches = matches && m.category === currentCategory && m.status !== 'archived';
+        if(currentCategory === "archive")
+          matches = matches && m.status === "archived";
+        if(currentCategory === "all")
+          matches = matches && m.status !== 'archived';
+        if(search)
+          matches = matches && (m.title.includes(search)||m.desc.includes(search));
+        if(priority)
+          matches = matches && m.priority === priority;
+        return matches;
+      });
+      renderMissions();
+    }
+
+    async function loadMissions() {
+      const snapshot = await db.collection('missions').get();
+      missions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      filterMissions();
+      document.getElementById('loader').style.display = "none";
+    }
+
+    async function saveMissions() {
+      if (!currentUser) return;
+      for (const m of missions) {
+        await db.collection('missions').doc(m.id).set({ ...m, uid: m.uid || currentUser.uid });
+      }
+      filterMissions();
+    }
+
+    // ---- Mission Modal: enforce per-user category permissions ----
+    function openMissionModal(editId=null, openChat=false) {
+      editMissionId = editId;
+      document.getElementById('missionModal').classList.remove('hidden');
+      // set allowed categories
+      let allowedCategories = allCategories;
+      if (currentUser && userCategoryPermissions[currentUser.email]) {
+        allowedCategories = userCategoryPermissions[currentUser.email];
+      }
+      // build category dropdown
+      const catSelect = document.getElementById('mCategory');
+      catSelect.innerHTML = '<option value="">קטגוריה</option>' + allowedCategories.map(c =>
+        `<option value="${c}">${c}</option>`
+      ).join('');
+      // fill rest of form
+      if(editId) {
+        const m = missions.find(x=>x.id===editId);
+        // Permission check - can only edit their allowed categories
+        if (!allowedCategories.includes(m.category)) {
+          alert("אין לך הרשאה לערוך משימות בקטגוריה זו");
+          document.getElementById('missionModal').classList.add('hidden');
+          return;
+        }
+        document.getElementById('modalTitle').textContent = "עריכת משימה";
+        document.getElementById('mTitle').value = m.title;
+        document.getElementById('mDesc').value = m.desc||'';
+        document.getElementById('mDue').value = m.due||'';
+        catSelect.value = m.category||'';
+        document.getElementById('mPriority').value = m.priority||'';
+        document.getElementById('mAssignee').value = m.assignee||'';
+        document.getElementById('mChecklist').value = (m.checklist||[]).join('\n');
+        loadChatMessages(editId);
+      } else {
+        document.getElementById('modalTitle').textContent = "משימה חדשה";
+        document.getElementById('missionForm').reset();
+        document.getElementById('chatMessages').innerHTML = "";
+      }
+      if (openChat && editId) {
+        setTimeout(()=>{ document.getElementById('chatInput').focus(); }, 300);
+      }
+    }
+    document.getElementById('addBtn').onclick = ()=>openMissionModal();
+    document.getElementById('missionForm').onsubmit = function(e) {
+      e.preventDefault();
+      // Permission enforcement
+      let allowedCategories = allCategories;
+      if (currentUser && userCategoryPermissions[currentUser.email]) {
+        allowedCategories = userCategoryPermissions[currentUser.email];
+      }
+      const chosenCat = document.getElementById('mCategory').value;
+      if (!allowedCategories.includes(chosenCat)) {
+        alert("אין לך הרשאה לקטגוריה זו");
+        return false;
+      }
+      let m = {
+        title: document.getElementById('mTitle').value,
+        desc: document.getElementById('mDesc').value,
+        due: document.getElementById('mDue').value,
+        category: chosenCat,
+        priority: document.getElementById('mPriority').value,
+        assignee: document.getElementById('mAssignee').value,
+        checklist: document.getElementById('mChecklist').value.split('\n').filter(Boolean),
+        id: editMissionId||Date.now().toString(),
+        status: editMissionId ? (missions.find(x=>x.id===editMissionId)?.status || "active") : "active",
+        uid: editMissionId ? (missions.find(x=>x.id===editMissionId)?.uid || currentUser?.uid) : currentUser?.uid
+      };
+      if(editMissionId) {
+        let idx = missions.findIndex(x=>x.id===editMissionId);
+        missions[idx] = m;
+      } else {
+        missions.push(m);
+      }
+      saveMissions();
+      document.getElementById('missionModal').classList.add('hidden');
+      editMissionId = null;
+      return false;
+    };
+    window.editMission = function(id){ openMissionModal(id, false); };
+
+    // -- Restrict delete/archive to only allowed categories
+    window.archiveMission = function(id) {
+      let idx = missions.findIndex(x=>x.id===id);
+      if(idx === -1) return;
+      let allowedCategories = allCategories;
+      if (currentUser && userCategoryPermissions[currentUser.email]) {
+        allowedCategories = userCategoryPermissions[currentUser.email];
+      }
+      const missionCat = missions[idx].category;
+      if (!allowedCategories.includes(missionCat)) {
+        alert("אין לך הרשאה למחוק או לארכב משימות בקטגוריה זו");
         return;
       }
-      // Get all missions (filtered by selectedCategory if you want)
-      let rows = [];
-      for (const m of missionsCache) {
-        if (selectedCategory !== "all" && m.category !== selectedCategory) continue;
-        // Get all feedback for each mission
-        let feedbackText = "";
-        const commentsCol = collection(db, 'missions', m.id, 'comments');
-        const commentsSnap = await getDocs(commentsCol);
-        let feedbacks = [];
-        commentsSnap.forEach(docSnap => {
-          const d = docSnap.data();
-          feedbacks.push(d.text ? d.text : "");
-        });
-        feedbackText = feedbacks.join("\n");
-        // One row per mission
-        rows.push({
-          Category: m.category || '',
-          Title: m.title || '',
-          Description: m.description || '',
-          Deadline: m.deadline || '',
-          Status: m.status || '',
-          Creator: m.creator || '',
-          Feedback: feedbackText
-        });
+      if(missions[idx].status === "archived") {
+        if(confirm("למחוק סופית את המשימה?")) {
+          db.collection('missions').doc(id).delete();
+          missions = missions.filter(x=>x.id!==id);
+        }
+      } else {
+        if(confirm("להעביר משימה לארכיון?")) {
+          missions[idx].status = "archived";
+          saveMissions();
+        }
       }
-      if (rows.length === 0) {
-        alert("No missions to export.");
-        return;
-      }
-      // Create worksheet & workbook
-      const ws = XLSX.utils.json_to_sheet(rows);
+      filterMissions();
+    };
+
+    // -- Chat logic inside mission modal --
+    let currentChatMissionId = null;
+    function openMissionChat(id) {
+      openMissionModal(id, true);
+    }
+    window.openMissionChat = openMissionChat;
+
+    function renderChatMessages(chatArr=[]) {
+      const chatMessages = document.getElementById('chatMessages');
+      if (!chatMessages) return;
+      chatMessages.innerHTML = chatArr.map(msg =>
+        `<div class="mb-1 text-right">
+          <span class="font-bold">${msg.user||'אנונימי'}:</span>
+          <span>${msg.text}</span>
+          <span class="text-xs text-gray-400 ltr ml-1">${msg.time}</span>
+        </div>`
+      ).join('');
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    function loadChatMessages(missionId) {
+      currentChatMissionId = missionId;
+      db.collection('missions').doc(missionId).collection('chat').orderBy('timestamp')
+        .onSnapshot(snapshot => {
+          const chatArr = snapshot.docs.map(doc => doc.data());
+          renderChatMessages(chatArr);
+        });
+    }
+    document.getElementById('chatForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const text = document.getElementById('chatInput').value.trim();
+      if(!text || !currentChatMissionId) return false;
+      await db.collection('missions').doc(currentChatMissionId).collection('chat').add({
+        text,
+        user: currentUser ? (currentUser.email || "אנונימי") : "אנונימי",
+        time: new Date().toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'}),
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById('chatInput').value = '';
+      return false;
+    };
+
+    // --- Export to Excel ---
+    document.getElementById('exportExcelBtn').onclick = function() {
+      const data = missions.map(m => ({
+        כותרת: m.title,
+        תיאור: m.desc,
+        קטגוריה: m.category,
+        עדיפות: m.priority,
+        משויך: m.assignee,
+        סטטוס: m.status === 'archived' ? 'בארכיון' : (m.status === 'done' ? 'בוצע' : 'פעיל'),
+        תאריך: m.due
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Missions");
+      XLSX.utils.book_append_sheet(wb, ws, "משימות");
+      XLSX.writeFile(wb, "משימות.xlsx");
+    };
 
-      // Add current date to filename
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const dateStr = `${yyyy}-${mm}-${dd}`;
-      XLSX.writeFile(wb, `missions_${dateStr}.xlsx`);
+    // --- Export to PDF ---
+    document.getElementById('exportPdfBtn').onclick = function() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({orientation: "landscape"});
+      let y = 15;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(14);
+      doc.text("רשימת משימות", 140, y, {align:"center"});
+      y += 10;
+      doc.setFontSize(11);
+      missions.forEach((m, i) => {
+        doc.text(
+          `${i+1}. ${m.title} | ${m.desc||""} | קטגוריה: ${m.category||""} | עדיפות: ${m.priority||""} | סטטוס: ${m.status==='archived'?'בארכיון':m.status==='done'?'בוצע':'פעיל'} | תאריך: ${m.due||""}`,
+          10, y, {align:"right"}
+        );
+        y += 8;
+        if (y > 190) { doc.addPage(); y = 15; }
+      });
+      doc.save("משימות.pdf");
+    };
+
+    // --- Listeners ---
+    document.getElementById('searchInput').oninput = filterMissions;
+    document.getElementById('priorityFilter').onchange = filterMissions;
+    document.querySelectorAll('.cat-tab').forEach(btn=>{
+      btn.onclick = ()=>{
+        currentCategory = btn.dataset.cat;
+        filterMissions();
+      };
     });
-
-  </script>
-</body>
+    </script>
+  </body>
 </html>
