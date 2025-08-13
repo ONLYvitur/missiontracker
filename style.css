@@ -65,3 +65,9 @@ input, select, textarea, button {
   h1 { font-size: 1.6rem; }
   .mission-card { font-size: 0.98rem; }
 }
+
+/* DEADLINE COLORS */
+.deadline-past { color: #fff !important; background: #e53e3e !important; border-radius: 8px; padding: 0 0.5em;}
+.deadline-today { color: #fff !important; background: #f59e42 !important; border-radius: 8px; padding: 0 0.5em;}
+.deadline-soon { color: #fff !important; background: #ecc94b !important; border-radius: 8px; padding: 0 0.5em;}
+.deadline-future { color: #1e293b !important; background: #d1fae5 !important; border-radius: 8px; padding: 0 0.5em;}
