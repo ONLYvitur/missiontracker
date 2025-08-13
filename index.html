@@ -23,8 +23,11 @@
     }
     .admin-only { display: none; }
     .admin-visible { display: inline-block !important; }
-    .feedback-list { max-height: 110px; overflow-y: auto; }
+    .feedback-list { max-height: 170px; overflow-y: auto; }
     .feedback-item { background: #f1f5f9; border-radius: 0.5rem; padding: 0.5rem; margin-bottom: 0.25rem; font-size:0.98em;}
+    .modal-fade { transition: opacity 0.2s, transform 0.2s; }
+    .rtl { direction: rtl; text-align: right; }
+    .ltr { direction: ltr; text-align: left; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800 flex flex-col items-center py-10 px-4">
@@ -98,13 +101,27 @@
     </div>
   </div>
 
+  <!-- Modal: Feedback -->
+  <div id="feedbackModal" class="hidden fixed inset-0 bg-black/30 z-30 flex justify-center items-center">
+    <div class="modal-fade bg-white p-6 rounded shadow max-w-md w-full relative" style="min-width:320px;">
+      <button id="closeFeedbackModal" class="absolute top-2 right-3 text-gray-400 hover:text-red-500 text-2xl font-bold">&times;</button>
+      <h2 class="text-lg font-bold mb-2 text-blue-700">משוב למשימה</h2>
+      <div class="feedback-list text-sm mb-3"></div>
+      <div class="flex gap-1">
+        <input class="feedback-input border p-2 rounded flex-1 transition-all" type="text" maxlength="300" placeholder="הוסף משוב..." autocomplete="off" />
+        <button class="feedback-submit bg-blue-100 text-blue-800 px-4 rounded font-semibold">Send</button>
+      </div>
+    </div>
+  </div>
+
   <template id="missionCardTpl">
     <div class="mission-card p-5 bg-white rounded shadow transition">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           <div class="flex gap-2 items-center mb-1">
             <span class="inline-block text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-bold" data-field="category"></span>
-            <h3 class="font-bold text-lg truncate" data-field="title">Title</h3>
+            <h3 class="font-bold text-lg break-words whitespace-normal" data-field="title">Title</h3>
+            <span class="status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2" data-field="status"></span>
           </div>
           <p class="mt-1" data-field="description">Description…</p>
           <p class="mt-1 text-sm text-gray-500" data-field="meta">—</p>
@@ -114,13 +131,9 @@
           <button class="delete underline text-red-600 hover:text-red-800 admin-only">Delete</button>
         </div>
       </div>
-      <!-- Feedback Section -->
-      <div class="mt-3">
-        <div class="feedback-list text-sm mb-2"></div>
-        <div class="flex gap-1">
-          <input class="feedback-input border p-1 rounded flex-1" type="text" maxlength="300" placeholder="Add feedback..." />
-          <button class="feedback-submit bg-blue-100 text-blue-800 px-2 rounded">Send</button>
-        </div>
+      <!-- Feedback Button -->
+      <div class="mt-4 flex justify-end">
+        <button class="open-feedback-btn bg-gray-100 hover:bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm font-semibold transition">משוב</button>
       </div>
     </div>
   </template>
@@ -164,6 +177,23 @@
     let isAdmin = false;
     let isSuperAdmin = false;
     let allowedCategories = [];
+
+    // Deadline formatting helpers
+    function formatDeadline(dateStr) {
+      if (!dateStr) return '—';
+      const date = new Date(dateStr);
+      if (isNaN(date)) return dateStr;
+      return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    function deadlineStatusClass(dateStr) {
+      if (!dateStr) return 'text-gray-500';
+      const now = new Date();
+      const date = new Date(dateStr);
+      const diff = (date - now) / (1000 * 60 * 60 * 24); // days
+      if (diff < 0) return 'text-red-600 font-bold'; // overdue
+      if (diff <= 3) return 'text-orange-600 font-semibold'; // soon
+      return 'text-green-700 font-semibold';
+    }
 
     async function checkIfAdmin(uid) {
       try {
@@ -264,6 +294,25 @@
     const cancelBtn = document.getElementById('cancelBtn');
     const categoryEl = document.getElementById('category');
     const categoryTabs = document.querySelectorAll('.cat-tab');
+
+    // Feedback modal elements
+    const feedbackModal = document.getElementById('feedbackModal');
+    const closeFeedbackModal = document.getElementById('closeFeedbackModal');
+    let feedbackListDiv = null;
+    let feedbackInput = null;
+    let feedbackSubmit = null;
+    let activeMissionId = null;
+    let feedbackUnsub = null;
+
+    closeFeedbackModal.onclick = () => {
+      feedbackModal.classList.add('hidden');
+      activeMissionId = null;
+      if (feedbackUnsub) feedbackUnsub();
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (!feedbackModal.classList.contains('hidden') && e.key === "Escape") closeFeedbackModal.onclick();
+    });
 
     let editingId = null;
     let missionsCache = [];
@@ -378,24 +427,57 @@
       }
     }
 
-    // FEEDBACK SECTION WITHOUT IMAGE SUPPORT
-    function renderFeedbackSection(missionId, cardEl) {
-      const feedbackList = cardEl.querySelector('.feedback-list');
-      const feedbackInput = cardEl.querySelector('.feedback-input');
-      const feedbackSubmit = cardEl.querySelector('.feedback-submit');
-      feedbackInput.value = "";
+    // Feedback Modal with RTL/LTR detection
+    function openFeedbackModal(missionId) {
+      feedbackModal.classList.remove('hidden');
+      activeMissionId = missionId;
+      feedbackListDiv = feedbackModal.querySelector('.feedback-list');
+      feedbackInput = feedbackModal.querySelector('.feedback-input');
+      feedbackSubmit = feedbackModal.querySelector('.feedback-submit');
+      feedbackInput.value = '';
+      feedbackInput.classList.remove('rtl','ltr');
+      feedbackInput.focus();
 
+      // Real-time feedback list
+      if (feedbackUnsub) feedbackUnsub();
       const commentsCol = collection(db, 'missions', missionId, 'comments');
-      onSnapshot(commentsCol, (snap) => {
-        feedbackList.innerHTML = '';
+      feedbackUnsub = onSnapshot(commentsCol, (snap) => {
+        feedbackListDiv.innerHTML = '';
+        const items = [];
         snap.forEach(doc => {
           const data = doc.data();
+          // RTL/LTR per feedback
+          const isHebrew = /[\u0590-\u05FF]/.test(data.text || "");
           const div = document.createElement('div');
-          div.className = 'feedback-item';
+          div.className = 'feedback-item ' + (isHebrew ? 'rtl' : 'ltr');
           div.innerHTML = `<b>${data.author || 'Anonymous'}:</b> ${data.text || ""}`;
-          feedbackList.appendChild(div);
+          items.push(div);
         });
+        items.reverse(); // Recent last
+        items.forEach(div=>feedbackListDiv.appendChild(div));
+        feedbackListDiv.scrollTop = feedbackListDiv.scrollHeight;
       });
+
+      // RTL/LTR detection on input
+      feedbackInput.oninput = () => {
+        const val = feedbackInput.value;
+        if (/[\u0590-\u05FF]/.test(val)) {
+          feedbackInput.classList.add('rtl');
+          feedbackInput.classList.remove('ltr');
+        } else {
+          feedbackInput.classList.remove('rtl');
+          feedbackInput.classList.add('ltr');
+        }
+      };
+      feedbackInput.oninput();
+
+      // Enter to send
+      feedbackInput.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          feedbackSubmit.click();
+        }
+      };
 
       feedbackSubmit.onclick = async () => {
         if (!currentUser) {
@@ -403,13 +485,13 @@
           return;
         }
         if (feedbackInput.value.trim() === '') return;
-
         await addDoc(commentsCol, {
           text: feedbackInput.value,
           author: currentUser ? currentUser.email : 'Anonymous',
           createdAt: serverTimestamp()
         });
         feedbackInput.value = '';
+        feedbackInput.oninput();
       };
     }
 
@@ -439,11 +521,25 @@
         cardEl.querySelector('[data-field="category"]').textContent = m.category || '';
         cardEl.querySelector('[data-field="title"]').textContent = m.title || 'Untitled';
         cardEl.querySelector('[data-field="description"]').textContent = m.description || '';
+
+        // DEADLINE visually improved
         const meta = [];
-        meta.push('Status: ' + (m.status || 'Pending'));
-        meta.push('Deadline: ' + (m.deadline || '—'));
+        const deadlineFormatted = formatDeadline(m.deadline);
+        const deadlineClass = deadlineStatusClass(m.deadline);
+        meta.push(`<span class="${deadlineClass}">📅 ${deadlineFormatted}</span>`);
         meta.push('Created by: ' + (m.creator || '—'));
-        cardEl.querySelector('[data-field="meta"]').textContent = meta.join(' | ');
+        cardEl.querySelector('[data-field="meta"]').innerHTML = meta.join(' | ');
+
+        // Status badge color
+        const statusBadge = cardEl.querySelector('.status-badge');
+        statusBadge.textContent = m.status || 'Pending';
+        if (m.status === "Complete") {
+          statusBadge.className = 'status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2 bg-green-200 text-green-900';
+        } else if (m.status === "In Progress") {
+          statusBadge.className = 'status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2 bg-yellow-200 text-yellow-900';
+        } else { // Pending or anything else
+          statusBadge.className = 'status-badge inline-block px-2 py-1 rounded text-xs font-bold ml-2 bg-gray-200 text-gray-900';
+        }
 
         const editBtn = cardEl.querySelector('.edit');
         const canEdit = isSuperAdmin || (isAdmin && allowedCategories.includes(m.category));
@@ -478,7 +574,8 @@
         }
         deleteBtn.addEventListener('click', () => deleteMissionAndComments(id, m.category));
 
-        renderFeedbackSection(id, cardEl);
+        // Feedback modal button
+        cardEl.querySelector('.open-feedback-btn').onclick = () => openFeedbackModal(id);
 
         missionsEl.appendChild(card);
       });
