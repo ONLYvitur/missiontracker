@@ -95,18 +95,16 @@ let currentCategory = "all";
 // --- DEADLINE COLOR HELPERS ---
 function getDeadlineColorClass(dueDateStr) {
   if (!dueDateStr) return '';
-  // today in yyyy-mm-dd
   const today = new Date();
   const todayStr = today.toISOString().slice(0,10);
   const due = new Date(dueDateStr + 'T23:59:59');
   const now = new Date();
-  // difference in ms
   const diff = due - now;
   const msInDay = 24*60*60*1000;
-  if (dueDateStr < todayStr) return 'deadline-past'; // overdue
-  if (diff < msInDay) return 'deadline-today'; // due today
-  if (diff < 3*msInDay) return 'deadline-soon'; // due in next 3 days
-  return 'deadline-future'; // further away
+  if (dueDateStr < todayStr) return 'deadline-past';
+  if (diff < msInDay) return 'deadline-today';
+  if (diff < 3*msInDay) return 'deadline-soon';
+  return 'deadline-future';
 }
 
 function renderMissions() {
@@ -117,7 +115,6 @@ function renderMissions() {
     return;
   }
   filteredMissions.forEach(m => {
-    // Permission check for edit/delete
     let allowedCategories = allCategories;
     let canEditDelete = false;
     if (currentUser && userCategoryPermissions[currentUser.email]) {
@@ -190,24 +187,21 @@ async function saveMissions() {
   filterMissions();
 }
 
-// ---- Mission Modal: enforce per-user category permissions and file upload ----
 function openMissionModal(editId=null, openChat=false) {
   editMissionId = editId;
   document.getElementById('missionModal').classList.remove('hidden');
-  // set allowed categories
   let allowedCategories = allCategories;
   if (currentUser && userCategoryPermissions[currentUser.email]) {
     allowedCategories = userCategoryPermissions[currentUser.email];
   }
-  // build category dropdown
   const catSelect = document.getElementById('mCategory');
   catSelect.innerHTML = '<option value="">קטגוריה</option>' + allowedCategories.map(c =>
     `<option value="${c}">${c}</option>`
   ).join('');
-  // fill rest of form
+  const filePreview = document.getElementById('filePreview');
+  filePreview.innerHTML = '';
   if(editId) {
     const m = missions.find(x=>x.id===editId);
-    // Permission check - can only edit their allowed categories
     if (!allowedCategories.includes(m.category)) {
       alert("אין לך הרשאה לערוך משימות בקטגוריה זו");
       document.getElementById('missionModal').classList.add('hidden');
@@ -222,10 +216,19 @@ function openMissionModal(editId=null, openChat=false) {
     document.getElementById('mAssignee').value = m.assignee||'';
     document.getElementById('mChecklist').value = (m.checklist||[]).join('\n');
     document.getElementById('mFile').value = '';
+    // file preview for edit
+    if (m && m.fileURL) {
+      if (m.fileType && m.fileType.startsWith('image/')) {
+        filePreview.innerHTML = `<img src="${m.fileURL}" alt="${m.fileName||''}" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #ccc;display:block;margin-top:8px">`;
+      } else {
+        filePreview.innerHTML = `<a href="${m.fileURL}" target="_blank" class="text-blue-600 underline" style="display:inline-block;margin-top:8px">הצג קובץ: ${m.fileName||'קובץ'}</a>`;
+      }
+    }
     loadChatMessages(editId);
   } else {
     document.getElementById('modalTitle').textContent = "משימה חדשה";
     document.getElementById('missionForm').reset();
+    filePreview.innerHTML = '';
     document.getElementById('chatMessages').innerHTML = "";
   }
   if (openChat && editId) {
@@ -245,7 +248,6 @@ document.getElementById('missionForm').onsubmit = async function(e) {
     return false;
   }
 
-  // File handle
   const fileInput = document.getElementById('mFile');
   const file = fileInput.files[0];
 
@@ -291,7 +293,6 @@ document.getElementById('missionForm').onsubmit = async function(e) {
 };
 window.editMission = function(id){ openMissionModal(id, false); };
 
-// -- Restrict delete/archive to only allowed categories
 window.archiveMission = function(id) {
   let idx = missions.findIndex(x=>x.id===id);
   if(idx === -1) return;
@@ -318,7 +319,6 @@ window.archiveMission = function(id) {
   filterMissions();
 };
 
-// -- Chat logic inside mission modal --
 let currentChatMissionId = null;
 function openMissionChat(id) {
   openMissionModal(id, true);
@@ -359,7 +359,6 @@ document.getElementById('chatForm').onsubmit = async function(e) {
   return false;
 };
 
-// --- Export to Excel ---
 document.getElementById('exportExcelBtn').onclick = function() {
   const data = missions.map(m => ({
     כותרת: m.title,
@@ -376,7 +375,6 @@ document.getElementById('exportExcelBtn').onclick = function() {
   XLSX.writeFile(wb, "משימות.xlsx");
 };
 
-// --- Listeners ---
 document.getElementById('searchInput').oninput = filterMissions;
 document.getElementById('priorityFilter').onchange = filterMissions;
 document.querySelectorAll('.cat-tab').forEach(btn=>{
