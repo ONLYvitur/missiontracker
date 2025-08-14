@@ -66,52 +66,47 @@ input, select, textarea, button {
   .mission-card { font-size: 0.98rem; }
 }
 
-/* BEAUTIFUL DEADLINE COLORS */
+/* DEADLINE COLORS: Red (overdue), Yellow (close), Green (far) */
 .deadline-past {
   color: #fff !important;
-  background: linear-gradient(90deg,#f85032 0%,#e73827 100%) !important;
+  background: #e53e3e !important; /* red-600 */
   border-radius: 10px;
   padding: 0 0.7em;
-  border: 2px solid #e73827;
-  box-shadow: 0 2px 8px #e7382722;
   font-weight: bold;
   letter-spacing: 1px;
 }
-.deadline-today {
-  color: #fff !important;
-  background: linear-gradient(90deg,#f7971e 0%,#ffd200 100%) !important;
+
+.deadline-soon, .deadline-today {
+  color: #7c5700 !important;
+  background: #ffe066 !important; /* yellow-200 */
   border-radius: 10px;
   padding: 0 0.7em;
-  border: 2px solid #f7971e;
-  box-shadow: 0 2px 8px #f7971e22;
   font-weight: bold;
   letter-spacing: 1px;
+  border: 1.5px solid #ffd700;
 }
-.deadline-soon {
-  color: #3b2f00 !important;
-  background: linear-gradient(90deg,#ffe259 0%,#ffa751 100%) !important;
-  border-radius: 10px;
-  padding: 0 0.7em;
-  border: 2px solid #ffa751;
-  font-weight: 600;
-  box-shadow: 0 1px 6px #ffa75122;
-}
+
 .deadline-future {
-  color: #185a9d !important;
-  background: linear-gradient(90deg,#a8edea 0%,#fed6e3 100%) !important;
+  color: #185a3d !important;
+  background: #b5f5b5 !important; /* green-100 */
   border-radius: 10px;
   padding: 0 0.7em;
-  border: 2px solid #a8edea;
   font-weight: 600;
-  box-shadow: 0 1px 6px #a8edea22;
+  letter-spacing: 1px;
+  border: 1.5px solid #38a169;
 }
+
 body.dark .deadline-future {
   color: #fff !important;
-  background: linear-gradient(90deg,#185a9d 0%,#43cea2 100%) !important;
-  border: 2px solid #185a9d;
+  background: #38a169 !important;
+  border: 1.5px solid #185a3d;
 }
-body.dark .deadline-soon {
-  color: #fff !important;
-  background: linear-gradient(90deg,#ffb347 0%,#ffcc33 100%) !important;
-  border: 2px solid #ffb347;
+body.dark .deadline-soon, body.dark .deadline-today {
+  color: #7c5700 !important;
+  background: #ffd700 !important;
+  border: 1.5px solid #ffe066;
+}
+body.dark .deadline-past {
+  background: #b91c1c !important;
+  border: 1.5px solid #e53e3e;
 }
