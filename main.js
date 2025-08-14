@@ -272,6 +272,7 @@ document.getElementById('missionForm').onsubmit = async function(e) {
     m.fileName = file.name;
     m.fileType = file.type;
   } else if (editMissionId) {
+    // *** THIS KEEPS THE OLD FILE INFO ***
     const existing = missions.find(x=>x.id === editMissionId);
     if (existing && existing.fileURL) {
       m.fileURL = existing.fileURL;
