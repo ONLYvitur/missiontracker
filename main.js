@@ -216,7 +216,6 @@ function openMissionModal(editId=null, openChat=false) {
     document.getElementById('mAssignee').value = m.assignee||'';
     document.getElementById('mChecklist').value = (m.checklist||[]).join('\n');
     document.getElementById('mFile').value = '';
-    // file preview for edit
     if (m && m.fileURL) {
       if (m.fileType && m.fileType.startsWith('image/')) {
         filePreview.innerHTML = `<img src="${m.fileURL}" alt="${m.fileName||''}" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #ccc;display:block;margin-top:8px">`;
@@ -235,6 +234,7 @@ function openMissionModal(editId=null, openChat=false) {
     setTimeout(()=>{ document.getElementById('chatInput').focus(); }, 300);
   }
 }
+
 document.getElementById('addBtn').onclick = ()=>openMissionModal();
 document.getElementById('missionForm').onsubmit = async function(e) {
   e.preventDefault();
@@ -272,7 +272,6 @@ document.getElementById('missionForm').onsubmit = async function(e) {
     m.fileName = file.name;
     m.fileType = file.type;
   } else if (editMissionId) {
-    // *** THIS KEEPS THE OLD FILE INFO ***
     const existing = missions.find(x=>x.id === editMissionId);
     if (existing && existing.fileURL) {
       m.fileURL = existing.fileURL;
@@ -376,11 +375,22 @@ document.getElementById('exportExcelBtn').onclick = function() {
   XLSX.writeFile(wb, "משימות.xlsx");
 };
 
-document.getElementById('searchInput').oninput = filterMissions;
-document.getElementById('priorityFilter').onchange = filterMissions;
+// --- Highlight selected category tab ---
 document.querySelectorAll('.cat-tab').forEach(btn=>{
   btn.onclick = ()=>{
     currentCategory = btn.dataset.cat;
+    // Remove highlight from all tabs
+    document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active-cat'));
+    // Highlight the clicked tab
+    btn.classList.add('active-cat');
     filterMissions();
   };
 });
+// highlight "all" tab on load
+document.addEventListener('DOMContentLoaded', function() {
+  const defaultTab = document.querySelector('.cat-tab[data-cat="all"]');
+  if(defaultTab) defaultTab.classList.add('active-cat');
+});
+
+document.getElementById('searchInput').oninput = filterMissions;
+document.getElementById('priorityFilter').onchange = filterMissions;
