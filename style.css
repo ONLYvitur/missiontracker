@@ -107,3 +107,16 @@ body.dark .deadline-past {
   background: #b91c1c !important;
   border: 1.5px solid #e53e3e;
 }
+
+/* Highlight selected category tab */
+.active-cat, .cat-tab.active-cat {
+  background: #2563eb !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px #2563eb22;
+  border: 1.5px solid #1d4ed8;
+}
+body.dark .active-cat, body.dark .cat-tab.active-cat {
+  background: #1e293b !important;
+  color: #a5b4fc !important;
+  border: 1.5px solid #6366f1;
+}
